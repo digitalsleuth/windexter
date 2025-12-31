@@ -4,13 +4,15 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 # User-specific files
+binaries*
+postbuild.ps1
 *.rsuser
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
 *.env
-@eaDir/
+@eaDir*
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

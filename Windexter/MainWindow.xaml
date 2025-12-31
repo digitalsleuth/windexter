@@ -23,7 +23,7 @@
                 </MenuItem>
             </MenuItem>
             <MenuItem Header="_Help" x:Name="HelpMenu">
-                <MenuItem Header="_About" x:Name="AboutWindow" InputGestureText="Ctrl+?" Click="AboutClick">
+                <MenuItem Header="_About" x:Name="AboutWindow" InputGestureText="Ctrl+Shift+A" Click="AboutClick">
                     <MenuItem.Icon>
                         <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE897;" FontSize="12" Foreground="#FF1644B9" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </MenuItem.Icon>
@@ -31,22 +31,24 @@
             </MenuItem>
         </Menu>
         <Grid x:Name="MainGrid" MinHeight="135">
-            <Button x:Name="DBPathPicker" Content="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="18" HorizontalAlignment="Left" BorderThickness="0" Background="White" Foreground="Gray" Margin="296,10,0,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Top" Height="22" Width="30" Click="DBPicker"/>
-            <TextBox x:Name="DBPath" IsReadOnly="True" Height="22" HorizontalAlignment="Left" Margin="99,10,0,0" TextWrapping="NoWrap" Text="" VerticalAlignment="Top" Width="192"/>
             <Label x:Name="DBPathLabel" Content="Database Path" HorizontalAlignment="Left" Margin="8,8,0,0" VerticalAlignment="Top" Height="26"/>
-            <Button x:Name="OutputPathPicker" Content="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="18" BorderThickness="0" Background="White" Foreground="Gray" HorizontalAlignment="Left" Margin="296,36,0,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Top" Height="22" Width="30" Click="OutputPicker"/>
-            <TextBox x:Name="OutputPath" IsReadOnly="True" Height="22" HorizontalAlignment="Left" Margin="99,36,0,0" TextWrapping="NoWrap" Text="" VerticalAlignment="Top" Width="192"/>
+            <TextBox x:Name="DBPath" Height="22" HorizontalAlignment="Left" Margin="99,10,0,0" TextWrapping="NoWrap" Text="" VerticalAlignment="Top" Width="192" TabIndex="0"/>
+            <Button x:Name="DBPathPicker" Content="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="18" HorizontalAlignment="Left" BorderThickness="0" Background="White" Foreground="Gray" Margin="296,10,0,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Top" Height="22" Width="30" Click="DBPicker" TabIndex="1"/>
             <Label x:Name="OutputPathLabel" Content="Output Path" HorizontalAlignment="Left" Margin="8,34,0,0" VerticalAlignment="Top" Height="26"/>
-            <Button x:Name="GoButton" Content="Go!" HorizontalAlignment="Left" Margin="11,64,0,0" VerticalAlignment="Top" Width="32" Height="22" Background="White" Click="GoButtonClick"/>
+            <TextBox x:Name="OutputPath" Height="22" HorizontalAlignment="Left" Margin="99,36,0,0" TextWrapping="NoWrap" Text="" VerticalAlignment="Top" Width="192" TabIndex="2"/>
+            <Button x:Name="OutputPathPicker" Content="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="18" BorderThickness="0" Background="White" Foreground="Gray" HorizontalAlignment="Left" Margin="296,36,0,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Top" Height="22" Width="30" Click="OutputPicker" TabIndex="3"/>
+            <Button x:Name="SelectDeselectButton" Content="Select All" HorizontalAlignment="Left" Margin="11,64,0,0" VerticalAlignment="Top" Width="70" Height="22" Background="White" Click="SelectDeselectAll" TabIndex="4"/>
+            <Button x:Name="GoButton" Content="Go!" HorizontalAlignment="Left" Margin="11,93,0,0" VerticalAlignment="Top" Width="32" Height="22" Background="White" IsDefault="True" Click="GoButtonClick" TabIndex="5"/>
             <ProgressBar x:Name="ProgressBarControl" HorizontalAlignment="Left" Height="22" Margin="99,126,0,10" VerticalAlignment="Top" Width="192" Background="White" Foreground="CornflowerBlue" Visibility="Collapsed" Value="0"/>
             <TextBox x:Name="StatusBox" HorizontalAlignment="Left" Margin="99,126,0,0" Height="22" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="192" BorderThickness="0" IsReadOnly="true" Visibility="Collapsed" Background="Transparent"/>
             <Label x:Name="TimerLabel" HorizontalAlignment="Left" Margin="290,123,0,0" VerticalAlignment="Top" Width="61" BorderThickness="0" Height="26" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" IsEnabled="False" Visibility="Collapsed"/>
-            <CheckBox x:Name="URLCheck" Content="URLs" HorizontalAlignment="Left" Margin="98,63,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any URLs found, if present."/>
-            <CheckBox x:Name="SummaryCheck" Content="Auto Summary" HorizontalAlignment="Left" Margin="98,83,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any Search Summaries found, if present."/>
-            <CheckBox x:Name="CompInfoCheck" Content="System Info" HorizontalAlignment="Left" Margin="206,63,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any basic computer information, if present."/>
-            <CheckBox x:Name="GPSCheck" Content="GPS" HorizontalAlignment="Left" Margin="206,83,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any GPS data found, if present."/>
-            <CheckBox x:Name="ActivityCheck" Content="Activity History" HorizontalAlignment="Left" Margin="98,103,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any Activity History data found, if present."/>
-            <CheckBox x:Name="TimelineCheck" Content="Timeline" HorizontalAlignment="Left" Margin="206,103,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet containing a timeline of all events."/>
+            <CheckBox x:Name="URLCheck" Content="URLs" HorizontalAlignment="Left" Margin="98,63,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any URLs found, if present." TabIndex="6"/>
+            <CheckBox x:Name="SummaryCheck" Content="Auto Summary" HorizontalAlignment="Left" Margin="98,83,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any Search Summaries found, if present." TabIndex="8"/>
+            <CheckBox x:Name="CompInfoCheck" Content="System Info" HorizontalAlignment="Left" Margin="206,63,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any basic computer information, if present." TabIndex="7"/>
+            <CheckBox x:Name="GPSCheck" Content="GPS" HorizontalAlignment="Left" Margin="206,83,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any GPS data found, if present." TabIndex="9"/>
+            <CheckBox x:Name="ActivityCheck" Content="Activity History" HorizontalAlignment="Left" Margin="98,103,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any Activity History data found, if present." TabIndex="10"/>
+            <CheckBox x:Name="TimelineCheck" Content="Timeline" HorizontalAlignment="Left" Margin="206,103,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet containing a timeline of all events." TabIndex="11"/>
+            
         </Grid>
     </DockPanel>
 </Window>

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Data;
 using System.Diagnostics;
 using System.IO;
@@ -20,7 +19,7 @@ namespace Windexter
     /// </summary>
     /// TODO:
     /// System.Message.ConversationIndex should be fixed
-    /// System.Media.Duration https://learn.microsoft.com/en-us/windows/win32/properties/props-system-media-duration - Need a sample to connect back to MediaDurations
+    /// 
     /// Combine details (ActivityHistory.DeviceMake, Model Serial, Computername) into Text Info file
 
     public partial class MainWindow : Window
@@ -186,7 +185,6 @@ namespace Windexter
             "System.Setting.SettingID",
             "System.Setting.PageID",
             "System.Message.ConversationID",
-            //"System.ProviderItemID",
             ];
         private static readonly List<string> uint64List = ["System.ActivityHistory.Importance", "System.ActivityHistory.ActiveDuration"];//, "System.Media.Duration"];
         private static readonly List<string> durations = ["System.Document.TotalEditingTime", "System.Media.Duration"];
@@ -412,6 +410,7 @@ namespace Windexter
             { "System.Communication.TaskStatus", TaskStatus }
         };
 
+        //System.Media.Duration https://learn.microsoft.com/en-us/windows/win32/properties/props-system-media-duration
         private static readonly (ulong min, string name)[] MediaDurations =
         [
             (0, "Very Short (under 1 min)"),
@@ -1688,14 +1687,22 @@ namespace Windexter
             elapsedTimer.Interval = TimeSpan.FromSeconds(1);
             CommandBindings.Add(new CommandBinding(KeyboardShortcuts.AboutClick, (sender, e) => { AboutClick(sender, e); }, (sender, e) => { e.CanExecute = true; }));
             InputBindings.Add(new KeyBinding(KeyboardShortcuts.AboutClick, new KeyGesture(Key.A, ModifierKeys.Control | ModifierKeys.Shift)));
+            CommandBindings.Add(new CommandBinding(KeyboardShortcuts.DBPicker, (sender, e) => { DBPicker(sender, e); }, (sender, e) => { e.CanExecute = true; }));
+            InputBindings.Add(new KeyBinding(KeyboardShortcuts.DBPicker, new KeyGesture(Key.D, ModifierKeys.Control)));
+            CommandBindings.Add(new CommandBinding(KeyboardShortcuts.OutputPicker, (sender, e) => { OutputPicker(sender, e); }, (sender, e) => { e.CanExecute = true; }));
+            InputBindings.Add(new KeyBinding(KeyboardShortcuts.OutputPicker, new KeyGesture(Key.O, ModifierKeys.Control)));
         }
         public static class KeyboardShortcuts
         {
             static KeyboardShortcuts()
             {
                 AboutClick = new RoutedCommand("AboutClick", typeof(MainWindow));
+                DBPicker = new RoutedCommand("DBPicker", typeof(MainWindow));
+                OutputPicker = new RoutedCommand("OutputPicker", typeof(MainWindow));
             }
             public static RoutedCommand AboutClick { get; private set; }
+            public static RoutedCommand DBPicker { get; private set; }
+            public static RoutedCommand OutputPicker { get; private set; }
 
         }
         private void ElapsedTime(object source, EventArgs e)
@@ -1742,7 +1749,8 @@ namespace Windexter
             {
                 Microsoft.Win32.OpenFileDialog openFile = new()
                 {
-                    Filter = "Windows Search Index Files|*.db;*.edb;" // *.edb is yet to come
+                    Title = "Select a Windows.db or Windows.edb file",
+                    Filter = "Windows Search Index Files|*.db;*.edb;"
                 };
                 if (openFile.ShowDialog() == true)
                 {
@@ -1755,9 +1763,25 @@ namespace Windexter
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Unable to load Database:\n{ex}", "Database Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                App.Current.MainWindow.Activate();
+                System.Windows.MessageBox.Show($"Unable to load Database:\n\n{ex.Message}", "Database Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 GoButton.IsEnabled = true;
             }
+        }
+
+        private void SelectDeselectAll(object sender, RoutedEventArgs e)
+        {
+            bool isSelectAll = SelectDeselectButton.Content.ToString() == "Select All";
+
+            foreach (object child in LogicalTreeHelper.GetChildren(MainGrid))
+            {
+                if (child is System.Windows.Controls.CheckBox cb)
+                {
+                    cb.IsChecked = isSelectAll;
+                }
+            }
+
+            SelectDeselectButton.Content = isSelectAll ? "Deselect All" : "Select All";
         }
 
         static List<string> GetMatchingFlags(long value, Dictionary<long, string> dict)
@@ -1799,6 +1823,12 @@ namespace Windexter
             ActivityCheck.IsChecked = false;
             TimelineCheck.IsEnabled = true;
             TimelineCheck.IsChecked = false;
+            DBPath.IsEnabled = true;
+            DBPathPicker.IsEnabled = true;
+            OutputPath.IsEnabled = true;
+            OutputPathPicker.IsEnabled = true;
+            SelectDeselectButton.Content = "Select All";
+            SelectDeselectButton.IsEnabled = true;
             IndexProperties.Clear();
             IndexResults.Clear();
             GatherResults.Clear();
@@ -1830,6 +1860,11 @@ namespace Windexter
             CompInfoCheck.IsEnabled = false;
             ActivityCheck.IsEnabled = false;
             TimelineCheck.IsEnabled = false;
+            SelectDeselectButton.IsEnabled = false;
+            DBPath.IsEnabled = false;
+            DBPathPicker.IsEnabled = false;
+            OutputPath.IsEnabled = false;
+            OutputPathPicker.IsEnabled = false;
             rows.Clear();
             paths.Clear();
             IndexProperties.Clear();
@@ -1856,12 +1891,14 @@ namespace Windexter
             {
                 if (DBPath.Text == "")
                 {
-                    System.Windows.MessageBox.Show("Database path is required. Please select a valid database path and try again.", "Database Path is required.", MessageBoxButton.OK);
+                    App.Current.MainWindow.Activate();
+                    System.Windows.MessageBox.Show("No database was selected.\n\nPlease select a valid database path and try again.", "Database Path is required.", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                     return;
                 }
                 if (OutputPath.Text == "")
                 {
-                    System.Windows.MessageBox.Show("Output path is required. Please select a valid output path and try again.", "Output Path is required.", MessageBoxButton.OK);
+                    App.Current.MainWindow.Activate();
+                    System.Windows.MessageBox.Show("No output path was selected.\n\nPlease select a valid output path and try again.", "Output Path is required.", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                     return;
                 }
                 SetupUI();
@@ -1900,13 +1937,15 @@ namespace Windexter
                 StatusBox.Foreground = System.Windows.Media.Brushes.White;
                 stopWatch?.Stop();
                 elapsedTimer?.Stop();
+                App.Current.MainWindow.Activate();
                 System.Windows.MessageBox.Show($"Data successfully exported to:\n\n{outputFile}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 stopWatch?.Stop();
                 elapsedTimer?.Stop();
-                System.Windows.MessageBox.Show($"Error with data extraction:\n{ex.Message}", "Data Extraction Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                App.Current.MainWindow.Activate();
+                System.Windows.MessageBox.Show($"Error with data extraction:\n\n{ex.Message}", "Data Extraction Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -1981,7 +2020,8 @@ namespace Windexter
                 }
                 catch (Exception ex)
                 {
-                    System.Windows.MessageBox.Show($"Unable to parse Gather database:\n{ex}", "Gather Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    App.Current.MainWindow.Activate();
+                    System.Windows.MessageBox.Show($"Unable to parse Gather database:\n\n{ex.Message}", "Gather Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     GoButton.IsEnabled = true;
                 }
             }
@@ -1995,7 +2035,8 @@ namespace Windexter
                     }
                     catch (Exception ex)
                     {
-                        System.Windows.MessageBox.Show($"Unable to parse Index database:\n{ex}", "Index Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        App.Current.MainWindow.Activate();
+                        System.Windows.MessageBox.Show($"Unable to parse Index database:\n\n{ex.Message}", "Index Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
                         GoButton.IsEnabled = true;
                     }
                 }
@@ -2076,7 +2117,8 @@ namespace Windexter
                 }
                 catch (Exception ex)
                 {
-                    System.Windows.MessageBox.Show($"Unable to parse Gather database:\n{ex}", "Gather Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    App.Current.MainWindow.Activate();
+                    System.Windows.MessageBox.Show($"Unable to parse Gather database:\n\n{ex.Message}", "Gather Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     GoButton.IsEnabled = true;
                 }
             }
@@ -2397,7 +2439,8 @@ namespace Windexter
                 }
                 catch (Exception ex)
                 {
-                    System.Windows.MessageBox.Show($"Unable to extract data from ESE database:\n{ex}", "Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    App.Current.MainWindow.Activate();
+                    System.Windows.MessageBox.Show($"Unable to extract data from ESE database:\n\n{ex.Message}", "Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     GoButton.IsEnabled = true;
                 }
             }
@@ -2476,7 +2519,8 @@ namespace Windexter
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Unable to Read and Store data:\n{ex}", "Database Read and Store Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                App.Current.MainWindow.Activate();
+                System.Windows.MessageBox.Show($"Unable to Read and Store data:\n\n{ex.Message}", "Database Read and Store Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -2688,7 +2732,8 @@ namespace Windexter
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Unable to read and correlate data:\n{ex}", "Data Correlation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                App.Current.MainWindow.Activate();
+                System.Windows.MessageBox.Show($"Unable to read and correlate data:\n\n{ex.Message}", "Data Correlation Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 GoButton.IsEnabled = true;
             }
         }
@@ -2891,7 +2936,8 @@ namespace Windexter
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Unable to read and correlate data:\n{ex}", "Data Correlation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                App.Current.MainWindow.Activate();
+                System.Windows.MessageBox.Show($"Unable to read and correlate data:\n\n{ex.Message}", "Data Correlation Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 GoButton.IsEnabled = true;
             }
         }
@@ -2949,12 +2995,8 @@ namespace Windexter
             ExcelPackage.License.SetNonCommercialOrganization("Digital Sleuth");
             if (dataToExport == null || dataToExport.Count == 0)
             {
-                System.Windows.MessageBox.Show(
-                    "No data to export.",
-                    "Export Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-
+                App.Current.MainWindow.Activate();
+                System.Windows.MessageBox.Show("No data to export.", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 GoButton.IsEnabled = true;
                 return false;
             }
@@ -3028,11 +3070,8 @@ namespace Windexter
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show(
-                    $"An error occurred while exporting: {ex.Message}",
-                    "Export Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                App.Current.MainWindow.Activate();
+                System.Windows.MessageBox.Show($"An error occurred while exporting:\n\n{ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 GoButton.IsEnabled = true;
                 return false;
             }
@@ -3070,6 +3109,7 @@ namespace Windexter
 
             if (dataToExport == null || dataToExport.Count == 0)
             {
+                App.Current.MainWindow.Activate();
                 System.Windows.MessageBox.Show("No data to export.", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 GoButton.IsEnabled = true;
                 return;
@@ -3088,7 +3128,8 @@ namespace Windexter
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"An error occurred while exporting: {ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                App.Current.MainWindow.Activate();
+                System.Windows.MessageBox.Show($"An error occurred while exporting:\n\n{ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 GoButton.IsEnabled = true;
             }
         }
@@ -3172,13 +3213,14 @@ namespace Windexter
 
         private void AboutClick(object sender, RoutedEventArgs e)
         {
+            App.Current.MainWindow.Activate();
             MessageBoxResult result = System.Windows.MessageBox.Show(
                 $"{displayName} v{appVersion}\n" +
-                "A simple Windows Search Index parser for the new SQLite versions.\n\n" +
+                "A simple Windows Search Index parser for the SQLite and ESE DB versions.\n\n" +
                 $"Author: Corey Forman (digitalsleuth)\n" +
                 $"Source: {githubBinaryRepo}\n\n" +
                 $"Would you like to visit the repo on GitHub?",
-                $"{displayName} v{appVersion}", MessageBoxButton.YesNoCancel, MessageBoxImage.Information);
+                $"{displayName} v{appVersion}", MessageBoxButton.YesNo, MessageBoxImage.Information);
             if (result == MessageBoxResult.Yes)
             {
                 Process.Start(new ProcessStartInfo($"{githubBinaryRepo}") { UseShellExecute = true });
