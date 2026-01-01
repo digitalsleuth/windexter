@@ -50,8 +50,8 @@
 
   <ItemGroup>
     <PackageReference Include="EPPlus" Version="8.4.0" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.1" />
-    <PackageReference Include="SQLitePCLRaw.core" Version="3.0.1" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.2" />
+    <PackageReference Include="SQLitePCLRaw.core" Version="3.0.2" />
   </ItemGroup>
 
   <ItemGroup>

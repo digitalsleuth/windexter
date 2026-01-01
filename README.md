@@ -61,7 +61,7 @@ Then, with Windexter open, click the Folder icon next to `Database Path` and bro
 Next, select any of the checkboxes you wish to provide additional filtering / analysis. You do not *need* to select a checkbox, and if none are selected, you will get the default options containing the `Indexed Results` for the `Windows.db` and `Windows.edb` databases, or the reconstructed file paths from the `Windows-gather.db`.
 
 Finally, click `Go!`. Your output will be saved as an XLSX file named either:
- 
+
  `WINDOWS-SEARCH-INDEX-<YYYYmmdd-HHMMSS>.xlsx` (for an SQLite `Windows.db` DB)  
  `WINDOWS-SEARCH-GATHER-<YYYYmmdd-HHMMSS>.xlsx` (for an SQLite `Windows-gather.db`)  
  `WINDOWS-SEARCH-ESEDB-<YYYYmmdd-HHMMSS>.xlsx` (for an ESE DB `Windows.edb`)
