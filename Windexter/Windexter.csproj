@@ -32,21 +32,21 @@
 	<FileVersion>$(Version)</FileVersion>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Remove="ico\fp128.png" />
-    <None Remove="libesedb.dll" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Remove="ico\fp128.png" />
+		<None Remove="libesedb.dll" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Content Include="ico\fp.ico" />
-    <Content Include="ico\fp128.png">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </Content>
-    <Content Include="libesedb.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
+	<ItemGroup>
+		<Content Include="ico\fp.ico" />
+		<Content Include="ico\fp128.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</Content>
+		<Content Include="libesedb.dll">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="EPPlus" Version="8.4.0" />

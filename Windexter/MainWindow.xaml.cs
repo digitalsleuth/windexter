@@ -18,9 +18,9 @@ namespace Windexter
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     /// TODO:
-    /// System.Message.ConversationIndex should be fixed
-    /// 
-    /// Combine details (ActivityHistory.DeviceMake, Model Serial, Computername) into Text Info file
+    /// - System.Message.ConversationIndex should be fixed
+    /// - HRESULT for VT_ERROR https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/a9046ed2-bfb2-4d56-a719-2824afce59ac
+    ///   and https://learn.microsoft.com/en-us/windows/win32/search/-search-prth-error-constants
 
     public partial class MainWindow : Window
     {
@@ -186,7 +186,7 @@ namespace Windexter
             "System.Setting.PageID",
             "System.Message.ConversationID",
             ];
-        private static readonly List<string> uint64List = ["System.ActivityHistory.Importance", "System.ActivityHistory.ActiveDuration"];//, "System.Media.Duration"];
+        private static readonly List<string> uint64List = ["System.ActivityHistory.Importance", "System.ActivityHistory.ActiveDuration"];
         private static readonly List<string> durations = ["System.Document.TotalEditingTime", "System.Media.Duration"];
         /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-document-totaleditingtime
 
@@ -386,6 +386,7 @@ namespace Windexter
         };
 
         private static readonly (ulong min, string name)[] Capacity =
+        /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-capacity
         [
             (0, "Empty"),
             (1, "Tiny"),
@@ -2177,7 +2178,7 @@ namespace Windexter
 
         public async Task ParseSubData()
         {
-            if (dbType == "index" || dbType == "esedb") //
+            if (dbType == "index" || dbType == "esedb")
             {
                 if ((bool)URLCheck.IsChecked!)
                 {
@@ -3092,70 +3093,6 @@ namespace Windexter
             return value.ToString() ?? string.Empty;
         }
 
-        private async Task ExportToCsv(string filePath, string results)
-        {
-            List<List<object>> dataToExport = results switch
-            {
-                "gather" => GatherResults,
-                "index" => IndexResults,
-                "url" => URLResults,
-                "gps" => GPSResults,
-                "summary" => SummaryResults,
-                "compinfo" => CompInfoResults,
-                "activity" => ActivityResults,
-                "esedb" => EseResults,
-                _ => [[]]
-            };
-
-            if (dataToExport == null || dataToExport.Count == 0)
-            {
-                App.Current.MainWindow.Activate();
-                System.Windows.MessageBox.Show("No data to export.", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                GoButton.IsEnabled = true;
-                return;
-            }
-            try
-            {
-                using StreamWriter writer = new(filePath, false, Encoding.UTF8);
-                writer.WriteLine(string.Join(",", dataToExport[0].Select(h => CsvEscape(h?.ToString() ?? string.Empty))));
-                for (int i = 1; i < dataToExport.Count; i++)
-                {
-                    var row = dataToExport[i];
-                    var line = string.Join(",", row.Select(value => CsvEscape(FormatValueForCsv(value))));
-                    await writer.WriteLineAsync(line);
-                }
-
-            }
-            catch (Exception ex)
-            {
-                App.Current.MainWindow.Activate();
-                System.Windows.MessageBox.Show($"An error occurred while exporting:\n\n{ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                GoButton.IsEnabled = true;
-            }
-        }
-
-        private static string FormatValueForCsv(object value)
-        {
-            if (value == null || value is DBNull)
-            {
-                return string.Empty;
-            }
-            if (value is byte[] bytes)
-            {
-                return BitConverter.ToString(bytes).Replace("-", "");
-            }
-            return value.ToString() ?? string.Empty;
-        }
-
-        private static string CsvEscape(string value)
-        {
-            if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
-            {
-                return $"\"{value.Replace("\"", "\"\"")}\"";
-            }
-            return value;
-        }
-
         public static List<string> ExtractUnicodeText(byte[] data, int minCharLength = 6)
         {
             var results = new List<string>();
@@ -3235,7 +3172,6 @@ namespace Windexter
 
         public static class SPSParser
         /// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-propstore/3453fb82-0e4f-4c2c-bc04-64b4bd2c51ec
-        /// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-oleps/f122b9d7-e5cf-4484-8466-83f6fd94b3cc
         /// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-oleps/f122b9d7-e5cf-4484-8466-83f6fd94b3cc
         /// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-oaut/5a2b34c4-d109-438e-9ec8-84816d8de40d - 0x06 Currency
         {
@@ -3374,8 +3310,6 @@ namespace Windexter
                     0x07 => reader.ReadDouble(), // VT_DATE
                     0x08 => ReadString(reader), // VT_BSTR
                     0x0A => reader.ReadUInt32(), // VT_ERROR
-                    // TODO: HRESULT https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/a9046ed2-bfb2-4d56-a719-2824afce59ac
-                    // https://learn.microsoft.com/en-us/windows/win32/search/-search-prth-error-constants
                     0x0B => reader.ReadInt32() != 0, // VT_BOOL
                     0x0E => ReadDecimal(reader), // VT_DECIMAL
                     0x10 => reader.ReadSByte(), // VT_I1
@@ -3784,7 +3718,7 @@ namespace Windexter
                     }
                 }
                 result = libesedb_table_get_number_of_records(tableHandle, out int numberOfRecords, out error);
-                rows.Add(columnInfo); //
+                rows.Add(columnInfo);
                 if (result == 1)
                 {
                     for (int i = 0; i < numberOfRecords; i++)
