@@ -53,4 +53,5 @@ Contains the entirety of the Indexed Results tab, but displaying all timestamps 
 
 ## Project Details
 
-This application was written in C#, utilizing the Windows Presentation Framework (WPF), and relies on [libesedb](https://github.com/libyal/libesedb/) project by Joachim Metz for easy access to the contents of the ESE database without the use of an API, and without the need to recover / repair for access. It also uses the [SQLitePCLRaw](https://www.nuget.org/packages/SQLitePCLRaw.bundle_e_sqlite3) library to enable read-only access to the SQLite databases.
+This application was written in C#, utilizing the Windows Presentation Framework (WPF), and relies on [libesedb](https://github.com/libyal/libesedb/) project by Joachim Metz for easy access to the contents of the ESE database without the use of an API, and without the need to recover / repair for access. It also uses the [SQLitePCLRaw](https://github.com/ericsink/SQLitePCL.raw) library to enable read-only access to the SQLite databases.  
+The Excel output is generated using the [EPPlus package](https://www.epplussoftware.com/en/LicenseOverview/) and is not intended for use in a commercial environment.
