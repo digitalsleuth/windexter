@@ -51,6 +51,21 @@ Contains the filtered contents of the Indexed Results tab which shows only the S
 
 Contains the entirety of the Indexed Results tab, but displaying all timestamps in a single column, based on their Source (ie. System.DateCreated, System.Search.GatherTime, etc). Easily filtered and sorted.
 
+## Usage
+
+First, extract or acquire a copy of the Windows Search Index database. This is typically located at:  
+`C:\ProgramData\Microsoft\Search\Data\Applications\Windows\{Windows.db,Windows-gather.db,Windows.edb}`
+
+Then, with Windexter open, click the Folder icon next to `Database Path` and browse to and select the location you've saved the database. Once selected, the Output path will automatically update to show the folder where the database is located, however you can change this by selecting the Folder icon next to `Output Path` and choosing a different location.
+
+Next, select any of the checkboxes you wish to provide additional filtering / analysis. You do not *need* to select a checkbox, and if none are selected, you will get the default options containing the `Indexed Results` for the `Windows.db` and `Windows.edb` databases, or the reconstructed file paths from the `Windows-gather.db`.
+
+Finally, click `Go!`. Your output will be saved as an XLSX file named either:
+ 
+ `WINDOWS-SEARCH-INDEX-<YYYYmmdd-HHMMSS>.xlsx` (for an SQLite `Windows.db` DB)  
+ `WINDOWS-SEARCH-GATHER-<YYYYmmdd-HHMMSS>.xlsx` (for an SQLite `Windows-gather.db`)  
+ `WINDOWS-SEARCH-ESEDB-<YYYYmmdd-HHMMSS>.xlsx` (for an ESE DB `Windows.edb`)
+
 ## Project Details
 
 This application was written in C#, utilizing the Windows Presentation Framework (WPF), and relies on [libesedb](https://github.com/libyal/libesedb/) project by Joachim Metz for easy access to the contents of the ESE database without the use of an API, and without the need to recover / repair for access. It also uses the [SQLitePCLRaw](https://github.com/ericsink/SQLitePCL.raw) library to enable read-only access to the SQLite databases.  
