@@ -9,7 +9,7 @@ win-dex-ter (ˈwɪndɛkstə˞r)
 
 ## What Windexter Does
 
-Windexter analyzes the contents of a `Windows.edb` (ESE database), `Windows.db` (SQLite database), or `Windows-gather.db` (SQLite database) and provides a legible output for forensic analysis in the form of an Excel spreadsheet.
+Windexter analyzes the contents of a `Windows.edb` (ESE database), `Windows.db` (SQLite database), or `Windows-gather.db` (SQLite database) and provides a legible output for forensic analysis in the form of an Excel spreadsheet.  
 
 The spreadsheet will contain anywhere from one to 9 tabs, based on the database provided and the options selected:
 
