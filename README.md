@@ -62,9 +62,9 @@ Next, select any of the checkboxes you wish to provide additional filtering / an
 
 Finally, click `Go!`. Your output will be saved as an XLSX file named either:
 
- `WINDOWS-SEARCH-INDEX-<YYYYmmdd-HHMMSS>.xlsx` (for an SQLite `Windows.db` DB)  
- `WINDOWS-SEARCH-GATHER-<YYYYmmdd-HHMMSS>.xlsx` (for an SQLite `Windows-gather.db`)  
- `WINDOWS-SEARCH-ESEDB-<YYYYmmdd-HHMMSS>.xlsx` (for an ESE DB `Windows.edb`)
+ `WINDOWS-SEARCH-INDEX-<yyyyMMdd HHmmss>.xlsx` (for an SQLite `Windows.db` DB)  
+ `WINDOWS-SEARCH-GATHER-<yyyyMMdd HHmmss>.xlsx` (for an SQLite `Windows-gather.db`)  
+ `WINDOWS-SEARCH-ESEDB-<yyyyMMdd HHmmss>.xlsx` (for an ESE DB `Windows.edb`)
 
 ## Project Details
 

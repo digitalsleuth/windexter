@@ -18,7 +18,7 @@ namespace Windexter
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     /// TODO:
-    /// - System.Message.ConversationIndex should be fixed
+    /// - Map PropMap.db Id's to .db Metadata and .edb PropertyStore Columns
     /// - HRESULT for VT_ERROR https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/a9046ed2-bfb2-4d56-a719-2824afce59ac
     ///   and https://learn.microsoft.com/en-us/windows/win32/search/-search-prth-error-constants
 
@@ -37,6 +37,8 @@ namespace Windexter
         private static readonly List<List<string>> paths = [];
         private static Dictionary<int, string> resolvedPaths = [];
         private static readonly List<List<object>> GatherResults = [];
+        private static bool GatherAvailable = false;
+        private static bool PropMapAvailable = false;
         private static List<List<object>> IndexResults = [];
         private static List<List<object>> IndexProperties = [];
         private static List<List<object>> URLResults = [];
@@ -46,10 +48,12 @@ namespace Windexter
         private static List<List<object>> ActivityResults = [];
         private static List<List<object>> EseResults = [];
         private static List<List<object>> Timeline = [];
+        private static List<List<object>> PropertyMapResults = [];
         private static readonly List<string> tables = [];
         private static List<List<object>> properties = [];
         private static List<List<object>> propertyStore = [];
         private static List<List<object>> propertyMetadata = [];
+        private static List<List<object>> propertyMap = [];
         private static Dictionary<string, string> eseProps = [];
         private static readonly List<string> lookups = [
             "System.FlagColor",
@@ -176,7 +180,12 @@ namespace Windexter
             "InvertedOnlyMD5",
             "System.ThumbnailCacheId",
             ];
-        private static readonly List<string> sfgaoField = ["System.Link.TargetSFGAOFlags", "System.SFGAOFlags"];
+
+        private static readonly List<string> sfgaoField = [
+            "System.Link.TargetSFGAOFlags", 
+            "System.SFGAOFlags"
+            ];
+
         private static readonly List<string> guids = [
             "System.Activity.ActivityId", 
             "System.ActivityHistory.Id", 
@@ -186,12 +195,21 @@ namespace Windexter
             "System.Setting.PageID",
             "System.Message.ConversationID",
             ];
-        private static readonly List<string> uint64List = ["System.ActivityHistory.Importance", "System.ActivityHistory.ActiveDuration"];
-        private static readonly List<string> durations = ["System.Document.TotalEditingTime", "System.Media.Duration"];
+
+        private static readonly List<string> uint64List = [
+            "System.ActivityHistory.Importance", 
+            "System.ActivityHistory.ActiveDuration"
+            ];
+
+        private static readonly List<string> durations = [
         /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-document-totaleditingtime
+            "System.Document.TotalEditingTime", 
+            "System.Media.Duration"
+            ];
+        
 
         private static readonly Dictionary<int, string> FlagColor = new()
-            /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-flagcolor
+        /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-flagcolor
             {
                 {1, "Purple" },
                 {2, "Orange" },
@@ -202,7 +220,7 @@ namespace Windexter
             };
 
         private static readonly Dictionary<int, string> ResponseStatus = new()
-            /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-calendar-responsestatus
+        /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-calendar-responsestatus
             {
                 {0, "None" },
                 {1, "Organized" },
@@ -213,7 +231,7 @@ namespace Windexter
             };
 
         private static readonly Dictionary<int, string> ShowTimeAs = new()
-            /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-calendar-showtimeas
+        /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-calendar-showtimeas
             {
                 {0, "Free" },
                 {1, "Tentative" },
@@ -222,7 +240,7 @@ namespace Windexter
             };
 
         private static readonly Dictionary<int, string> Sensitivity = new()
-            /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-sensitivity
+        /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-sensitivity
             {
                 {0, "Normal" },
                 {1, "Personal" },
@@ -231,7 +249,7 @@ namespace Windexter
             };
 
         private static readonly Dictionary<int, string> FlagStatus = new()
-            /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-flagstatus
+        /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-flagstatus
             {
                 {0, "Not Flagged" },
                 {1, "Completed" },
@@ -239,7 +257,7 @@ namespace Windexter
             };
 
         private static readonly Dictionary<int, string> Importance = new()
-            /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-importance
+        /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-importance
             {
                 {0, "Low" },
                 {1, "Low" },
@@ -250,7 +268,7 @@ namespace Windexter
             };
 
         private static readonly Dictionary<int, string> ImageCompression = new()
-            /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-image-compression
+        /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-image-compression
             {
                 {1, "Uncompressed" },
                 {2, "CCITT T.3" },
@@ -262,7 +280,7 @@ namespace Windexter
             };
 
         private static readonly Dictionary<int, string> SyncTransferStatus = new()
-            /// https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/ne-shobjidl_core-sync_transfer_status
+        /// https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/ne-shobjidl_core-sync_transfer_status
             {
                 {0, "None" },
                 {0x1, "Needs Upload" },
@@ -279,7 +297,7 @@ namespace Windexter
             };
 
         private static readonly Dictionary<int, string> TaskStatus = new()
-            /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-communication-taskstatus
+        /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-communication-taskstatus
             {
                 {0, "Not Started" },
                 {1, "In Progress" },
@@ -289,8 +307,8 @@ namespace Windexter
             };
 
         private static readonly Dictionary<long, string> MessageFlags = new()
-            ///https://learn.microsoft.com/en-us/office/client-developer/outlook/mapi/pidtagmessageflags-canonical-property
-            ///https://officeprotocoldoc.z19.web.core.windows.net/files/MS-OXCMSG/%5bMS-OXCMSG%5d.pdf
+        ///https://learn.microsoft.com/en-us/office/client-developer/outlook/mapi/pidtagmessageflags-canonical-property
+        ///https://officeprotocoldoc.z19.web.core.windows.net/files/MS-OXCMSG/%5bMS-OXCMSG%5d.pdf
             {
                 { 0x01, "MSGFLAG_READ"},
                 { 0x02, "MSGFLAG_UNMODIFIED"},
@@ -411,9 +429,10 @@ namespace Windexter
             { "System.Communication.TaskStatus", TaskStatus }
         };
 
-        //System.Media.Duration https://learn.microsoft.com/en-us/windows/win32/properties/props-system-media-duration
-        private static readonly (ulong min, string name)[] MediaDurations =
-        [
+        
+        private static readonly (ulong min, string name)[] MediaDurations = 
+        /// https://learn.microsoft.com/en-us/windows/win32/properties/props-system-media-duration
+        [    
             (0, "Very Short (under 1 min)"),
             (600000000, "Short (1 - 5 mins)"),
             (3000000000, "Medium (5 - 30 mins)"),
@@ -434,6 +453,7 @@ namespace Windexter
             return result;
         }
 
+        private static readonly Dictionary<string, (string guid, int propertyId)> PropertyKeys = new()
         /// PropertyKeys extracted from propkey.h from the Windows Kit
         /// Actual values can be found here: https://learn.microsoft.com/en-us/windows/win32/properties/props
         /// https://learn.microsoft.com/en-us/windows/win32/search/-search-3x-wds-propertymappings
@@ -443,7 +463,6 @@ namespace Windexter
         /// Activity_ and ActivityHistory_ values from: https://cdn.callback.com/shellboost/doc/Reference/ShellBoost-Core-Assembly/html/f2805716-6023-897c-2234-d79a4feb5c5f.htm
         /// and also correlated between databases and Properties.
         /// Media Formats: https://gix.github.io/media-types/
-        private static readonly Dictionary<string, (string guid, int propertyId)> PropertyKeys = new()
         {
             { "Activity_AccountID", ("{c5043536-932e-219e-5fb9-1c2807d7b03e}", 626) },
             { "Activity_ActivityId", ("{c5043536-932e-219e-5fb9-1c2807d7b03e}", 620) },
@@ -1606,7 +1625,11 @@ namespace Windexter
             { "Volume_IsMappedDrive", ("{149c0b69-2c2d-48fc-808f-d318d78c4636}", 2) },
             { "Volume_IsRoot", ("{9b174b35-40ff-11d2-a27e-00c04fc30871}", 10) },
         };
+
         private static readonly Dictionary<long, string> VariantType = new()
+        /// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-oaut/3fe7db9f-5803-4dc4-9d14-5425d3f5461f
+        /// https://learn.microsoft.com/en-us/dotnet/api/microsoft.visualstudio.package.variant.varianttype?view=visualstudiosdk-2019
+        /// https://learn.microsoft.com/en-us/windows/win32/api/wtypes/ne-wtypes-varenum
         {
             {0x0000,"VT_EMPTY"},
             {0x0001,"VT_NULL"},
@@ -1617,8 +1640,11 @@ namespace Windexter
             {0x0006,"VT_CY"},
             {0x0007,"VT_DATE"},
             {0x0008,"VT_BSTR"},
+            {0x0009,"VT_DISPATCH"},
             {0x000A,"VT_ERROR"},
             {0x000B,"VT_BOOL"},
+            {0x000C,"VT_VARIANT"},
+            {0x000D,"VT_UNKNOWN"},
             {0x000E,"VT_DECIMAL"},
             {0x0010,"VT_I1"},
             {0x0011,"VT_UI1"},
@@ -1628,8 +1654,17 @@ namespace Windexter
             {0x0015,"VT_UI8"},
             {0x0016,"VT_INT"},
             {0x0017,"VT_UINT"},
+            {0x0018,"VT_VOID"},
+            {0x0019,"VT_HRESULT"},
+            {0x001A,"VT_PTR"},
+            {0x001B,"VT_SAFEARRAY"},
+            {0x001C,"VT_CARRAY"},
+            {0x001D,"VT_USERDEFINED"},
             {0x001E,"VT_LPSTR"},
             {0x001F,"VT_LPWSTR"},
+            {0x0024,"VT_RECORD" },
+            {0x0025,"VT_INT_PTR" },
+            {0x0026,"VT_UINT_PTR" },
             {0x0040,"VT_FILETIME"},
             {0x0041,"VT_BLOB"},
             {0x0042,"VT_STREAM"},
@@ -1640,6 +1675,8 @@ namespace Windexter
             {0x0047,"VT_CF"},
             {0x0048,"VT_CLSID"},
             {0x0049,"VT_VERSIONED_STREAM"},
+            {0x0FFF,"VT_BSTR_BLOB"},
+            {0x1000,"VT_VECTOR"},
             {0x1002,"VT_VECTOR_I2"},
             {0x1003,"VT_VECTOR_I4"},
             {0x1004,"VT_VECTOR_R4"},
@@ -1661,6 +1698,7 @@ namespace Windexter
             {0x1040,"VT_VECTOR_FILETIME"},
             {0x1047,"VT_VECTOR_CF"},
             {0x1048,"VT_VECTOR_CLSID"},
+            {0x2000,"VT_ARRAY"},
             {0x2002,"VT_ARRAY_I2"},
             {0x2003,"VT_ARRAY_I4"},
             {0x2004,"VT_ARRAY_R4"},
@@ -1677,8 +1715,12 @@ namespace Windexter
             {0x2012,"VT_ARRAY_UI2"},
             {0x2013,"VT_ARRAY_UI4"},
             {0x2016,"VT_ARRAY_INT"},
-            {0x2017,"VT_ARRAY_UINT"}
+            {0x2017,"VT_ARRAY_UINT"},
+            {0x4000,"VT_BYREF"},
+            {0x8000,"VT_RESERVED"},
+            {0xFFFF,"VT_ILLEGAL"}
         };
+
         public MainWindow()
         {
             InitializeComponent();
@@ -1693,6 +1735,7 @@ namespace Windexter
             CommandBindings.Add(new CommandBinding(KeyboardShortcuts.OutputPicker, (sender, e) => { OutputPicker(sender, e); }, (sender, e) => { e.CanExecute = true; }));
             InputBindings.Add(new KeyBinding(KeyboardShortcuts.OutputPicker, new KeyGesture(Key.O, ModifierKeys.Control)));
         }
+
         public static class KeyboardShortcuts
         {
             static KeyboardShortcuts()
@@ -1706,12 +1749,14 @@ namespace Windexter
             public static RoutedCommand OutputPicker { get; private set; }
 
         }
+
         private void ElapsedTime(object source, EventArgs e)
         {
             TimeSpan timeSpan = stopWatch!.Elapsed;
             string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}", timeSpan.Hours, timeSpan.Minutes, timeSpan.Seconds);
             TimerLabel.Content = elapsedTime;
         }
+
         private void OutputPicker(object sender, RoutedEventArgs e)
         {
             string initialDirectory;
@@ -1744,6 +1789,7 @@ namespace Windexter
                 OutputPath.ToolTip = selectedPath;
             }
         }
+
         private void DBPicker(object sender, RoutedEventArgs e)
         {
             try
@@ -1845,6 +1891,7 @@ namespace Windexter
             propertyMetadata.Clear();
             tables.Clear();
         }
+
         private void SetupUI()
         {
             stopWatch?.Reset();
@@ -1907,6 +1954,42 @@ namespace Windexter
                 await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
                 StatusBox.Text = "Extracting data ...";
                 await Task.Run(() => ExtractData());
+                if (!dbFile.Contains("gather") && dbType == "index")
+                {
+                    GatherAvailable = File.Exists(dbFile.Replace("Windows.db", "Windows-gather.db"));
+                    if (GatherAvailable)
+                    {
+                        MessageBoxResult result = System.Windows.MessageBox.Show("Windexter has found a Windows-gather.db in the same directory as the selected database.\n\nDo you want to process this as well?", "Windows-gather.db exists! Process?", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            dbFile = dbFile.Replace("Windows.db", "Windows-gather.db");
+                            await Task.Run(() => ExtractData());
+                            dbType = "index";
+                        }
+                        else if (result == MessageBoxResult.Cancel)
+                        {
+                            ResetUI();
+                            return;
+                        }
+                    }
+                    var propPath = string.Concat(Path.GetDirectoryName(dbFile), "\\Projects\\SystemIndex\\PropMap\\PropMap.db");
+                    PropMapAvailable = File.Exists(propPath);
+                    if (PropMapAvailable)
+                    {
+                        MessageBoxResult result = System.Windows.MessageBox.Show("Windexter has found a PropMap.db in a sub-directory of the selected folder.\n\nDo you want to process this as well?", "PropMap.db exists! Process?", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            dbFile = propPath;
+                            await Task.Run(() => ExtractData());
+                            dbType = "index";
+                        }
+                        else if (result == MessageBoxResult.Cancel)
+                        {
+                            ResetUI();
+                            return;
+                        }
+                    }
+                }
                 outputFile = Path.Combine(OutputPath.Text, $"WINDOWS-SEARCH-{dbType.ToUpper()}-{now}.xlsx");
                 StatusBox.Text = "Parsing data ...";
                 await ParseDataAsync();
@@ -1927,6 +2010,7 @@ namespace Windexter
                     ["Activity"] = ActivityResults,
                     ["Search Summary"] = SummaryResults,
                     ["Timeline"] = Timeline,
+                    ["Property Map"] = PropertyMapResults,
                 };
                 if (!await ExportToExcel(outputFile, AllResults))
                 {
@@ -1946,7 +2030,7 @@ namespace Windexter
                 stopWatch?.Stop();
                 elapsedTimer?.Stop();
                 App.Current.MainWindow.Activate();
-                System.Windows.MessageBox.Show($"Error with data extraction:\n\n{ex.Message}", "Data Extraction Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"Error with data extraction:\n\n{ex.Message}\n{ex}", "Data Extraction Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -1975,64 +2059,23 @@ namespace Windexter
         {
             DateTime nowDt = DateTime.Now.ToUniversalTime();
             string now = nowDt.ToString("yyyyMMdd-HHmmss");
-            if (dbType == "gather")
-            {
-                try
-                {
-                    var resolvedPathsDict = resolvedPaths.ToDictionary(kvp => (long)kvp.Key, kvp => kvp.Value);
-                    for (int i = 1; i < rows.Count; i++)
-                    {
-                        var row = rows[i];
-                        if (row.Count > 0)
-                        {
-                            if (row[0] is long key)
-                            {
-                                if (resolvedPathsDict.TryGetValue(key, out string? path) && row[1] is string fileName)
-                                {
-                                    string full_path = string.Concat(path, fileName);
-                                    row[0] = full_path;
-                                }
-                            }
-                            if (row.Count > 4 && row[4] is byte[] userDataBytes)
-                            {
-                                var SPSStore = SPSParser.ParseToJson(userDataBytes);
-                                row[4] = SPSStore;
-                            }
-                            if (row.Count > 6 && row[6] is byte[] dtcellBytes)
-                            {
-                                long filetime = BitConverter.ToInt64(dtcellBytes, 0);
-                                DateTime dt = DateTime.FromFileTimeUtc(filetime);
-                                string dtFormatted = dt.ToString("yyyy-MM-dd HH:mm:ss");
-                                row[6] = dtFormatted;
-                            }
-                        }
-                    }
-                    GatherResults.Add(["FullPath"]);
-                    GatherResults[0].AddRange(rows[0].Skip(1));
-                    GatherResults.AddRange(rows.GetRange(1, rows.Count - 1));
-                    int columnIndex = 1;
-                    foreach (var row in GatherResults)
-                    {
-                        if (row.Count > columnIndex)
-                        {
-                            row.RemoveAt(columnIndex);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    App.Current.MainWindow.Activate();
-                    System.Windows.MessageBox.Show($"Unable to parse Gather database:\n\n{ex.Message}", "Gather Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    GoButton.IsEnabled = true;
-                }
-            }
-            else if (dbType == "index")
+            if (dbType == "index")
             {
                 if (propertyMetadata.Count > 0 && propertyStore.Count > 0)
                 {
                     try
                     {
                         await Task.Run(() => GetIndexPropertyStore(propertyStore, propertyMetadata));
+                        if (GatherAvailable)
+                        {
+                            ParseGatherData();
+                            GatherAvailable = false;
+                        }
+                        if (PropMapAvailable)
+                        {
+                            ParsePropertyMap();
+                            PropMapAvailable = false;
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -2042,85 +2085,134 @@ namespace Windexter
                     }
                 }
             }
-            else if (dbType == "esedb")
+            else if (dbType == "esedb" || dbType == "gather")
             {
                 try
                 {
-                    var resolvedPathsDict = resolvedPaths.ToDictionary(kvp => (long)kvp.Key, kvp => kvp.Value);
-                    List<object> header = rows[0];
-                    int fn = header.IndexOf("FileName");
-                    List<object> newHeader = ["FullPath"];
-                    newHeader.AddRange(header);
-                    GatherResults.Add(newHeader);
-                    for (int i = 1; i < rows.Count; i++)
+                    ParseGatherData();
+                    if (dbType == "esedb")
                     {
-                        var row = rows[i];
-                        if (row.Count > 0)
-                        {
-                            var newRow = new List<object>();
-                            string fullPath = "";
-                            for (int j = 0; j < row.Count; j++)
-                            {
-                                object item = row[j];
-                                object value = item;
-                                string colName = header[j].ToString()!;
-                                if (colName == "ScopeID")
-                                {
-                                    uint key = (uint)item;
-                                    if (row[fn] is string fileName)
-                                    {
-                                        string path = resolvedPathsDict.GetValueOrDefault(key, "::Unknown::/");
-                                        fullPath = string.Concat(path, fileName);
-                                        newRow.Insert(0, fullPath);
-                                        value = key;
-                                    }
-                                }
-                                else if (colName == "UserData" && item is byte[] userDataBytes)
-                                {
-                                    value = SPSParser.ParseToJson(userDataBytes);
-                                }
-                                else if (colName == "LastModified" && item is byte[] dtcellBytes)
-                                {
-                                    if (dtcellBytes.Length == 8 && !dtcellBytes.All(b => b == 0x2A))
-                                    {
-                                        var a = BitConverter.ToInt64(dtcellBytes);
-                                        Array.Reverse(dtcellBytes);
-                                        long filetime = BitConverter.ToInt64(dtcellBytes, 0);
-                                        if (filetime != 1)
-                                        {
-                                            value = DateTime.FromFileTimeUtc(filetime).ToString("yyyy-MM-dd HH:mm:ss");
-                                        }
-                                        else
-                                        {
-                                            value = "null";
-                                        }
-                                    }
-                                    else
-                                    {
-                                        value = "null";
-                                    }
-                                }
-                                else if (colName == "StartAddressIdentifier" && item is byte[] startAddId)
-                                {
-                                    value = BitConverter.ToInt16(startAddId, 0);
-                                }
-                                else if ((colName == "Priority" || colName == "FailureUpdateAttempts") && item is byte[] singleByteArr)
-                                {
-                                    value = singleByteArr[0];
-                                }
-                                newRow.Add(value);
-                            }
-                            GatherResults.Add(newRow);
-                        }
+                        GetEsePropertyStore();
+                        GetEseProperties();
                     }
-                    GetEsePropertyStore();
-                    GetEseProperties();
                 }
                 catch (Exception ex)
                 {
                     App.Current.MainWindow.Activate();
-                    System.Windows.MessageBox.Show($"Unable to parse Gather database:\n\n{ex.Message}", "Gather Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    System.Windows.MessageBox.Show($"Unable to parse Gather Data:\n\n{ex.Message}", "Gather Data Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     GoButton.IsEnabled = true;
+                }
+            }
+        }
+
+        private void ParseGatherData()
+        {
+            DateTime nowDt = DateTime.Now.ToUniversalTime();
+            string now = nowDt.ToString("yyyyMMdd-HHmmss");
+            try
+            {
+                var resolvedPathsDict = resolvedPaths.ToDictionary(kvp => (long)kvp.Key, kvp => kvp.Value);
+                List<object> header = rows[0];
+                int fn = header.IndexOf("FileName");
+                List<object> newHeader = ["FullPath"];
+                newHeader.AddRange(header);
+                GatherResults.Add(newHeader);
+                for (int i = 1; i < rows.Count; i++)
+                {
+                    var row = rows[i];
+                    if (row.Count > 0)
+                    {
+                        var newRow = new List<object>();
+                        string fullPath = "";
+                        for (int j = 0; j < row.Count; j++)
+                        {
+                            object item = row[j];
+                            object value = item;
+                            string colName = header[j].ToString()!;
+                            if (colName == "ScopeID")
+                            {
+                                object key = dbType == "esedb" ? (uint)item : (long)item;
+                                if (row[fn] is string fileName)
+                                {
+                                    string path = resolvedPathsDict.GetValueOrDefault((long)key, "::Unknown::/");
+                                    fullPath = string.Concat(path, fileName);
+                                    newRow.Insert(0, fullPath);
+                                    value = key;
+                                }
+                            }
+                            else if (colName == "UserData" && item is byte[] userDataBytes)
+                            {
+                                value = SPSParser.ParseToJson(userDataBytes);
+                            }
+                            else if (colName == "LastModified" && item is byte[] dtcellBytes)
+                            {
+                                if (dtcellBytes.Length == 8 && !dtcellBytes.All(b => b == 0x2A))
+                                {
+                                    if (dbType == "esedb")
+                                    {
+                                        Array.Reverse(dtcellBytes);
+                                    }
+                                    long filetime = BitConverter.ToInt64(dtcellBytes, 0);
+                                    if (filetime != 1)
+                                    {
+                                        value = DateTime.FromFileTimeUtc(filetime).ToString("yyyy-MM-dd HH:mm:ss");
+                                    }
+                                    else
+                                    {
+                                        value = null!;
+                                    }
+                                }
+                                else
+                                {
+                                    value = null!;
+                                }
+                            }
+                            else if (colName == "StartAddressIdentifier" && item is byte[] startAddId)
+                            {
+                                value = BitConverter.ToInt16(startAddId, 0);
+                            }
+                            else if ((colName == "Priority" || colName == "FailureUpdateAttempts") && item is byte[] singleByteArr)
+                            {
+                                value = singleByteArr[0];
+                            }
+                            newRow.Add(value);
+                        }
+                        GatherResults.Add(newRow);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Current.MainWindow.Activate();
+                System.Windows.MessageBox.Show($"Unable to parse Gather Data:\n\n{ex.Message}", "Gather Data Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                GoButton.IsEnabled = true;
+            }
+        }
+
+        private static void ParsePropertyMap()
+        {
+            List<object> header = propertyMap[0];
+            PropertyMapResults.Add(["Guid", "FormatId", "PropertyId", "StandardId", "MaxSize"]);
+            for (int i = 1; i < propertyMap.Count; i++)
+            {
+                var row = propertyMap[i];
+                if (row.Count > 0)
+                {
+                    var newRow = new List<object>();
+                    for (int j = 0; j < row.Count; j++)
+                    {
+                        object item = row[j];
+                        object value = item;
+                        string colName = header[j].ToString()!;
+                        if (colName == "FormatId")
+                        {
+                            value = BitConverter.ToString((byte[])value).Replace("-","");
+                            Guid guid = new((string)value);
+                            value = guid.ToString("B").ToUpper();
+                        }
+                        newRow.Add(value);
+                    }
+                    PropertyMapResults.Add(newRow);
                 }
             }
         }
@@ -2182,7 +2274,16 @@ namespace Windexter
             {
                 if ((bool)URLCheck.IsChecked!)
                 {
-                    var selectedColumns = new List<string> { "WorkId", "System.Search.GatherTime", "System.DateCreated", "System.DateModified", "System.ItemType", "System.Link.TargetUrl", "System.History.VisitCount" };
+                    var selectedColumns = new List<string>
+                    { 
+                        "WorkId", 
+                        "System.Search.GatherTime", 
+                        "System.DateCreated", 
+                        "System.DateModified", 
+                        "System.ItemType", 
+                        "System.Link.TargetUrl", 
+                        "System.History.VisitCount"
+                    };
                     List<List<object>> temp = FilterColumns(IndexResults, selectedColumns);
                     int urlIdx = temp[0].IndexOf("System.Link.TargetUrl");
                     if (urlIdx > 0)
@@ -2200,7 +2301,24 @@ namespace Windexter
                 }
                 if ((bool)GPSCheck.IsChecked!)
                 {
-                    var selectedColumns = new List<string> { "WorkId", "System.Search.GatherTime", "System.ComputerName", "System.VolumeId", "System.FileName", "System.ItemPathDisplay", "System.DateCreated", "System.DateModified", "System.GPS.LatitudeRef", "System.GPS.LatitudeDecimal", "System.GPS.LongitudeRef", "System.GPS.LongitudeDecimal", "System.Photo.DateTaken", "System.Photo.CameraManufacturer", "System.Photo.CameraModel" };
+                    var selectedColumns = new List<string>
+                    { 
+                        "WorkId", 
+                        "System.Search.GatherTime", 
+                        "System.ComputerName", 
+                        "System.VolumeId", 
+                        "System.FileName", 
+                        "System.ItemPathDisplay", 
+                        "System.DateCreated", 
+                        "System.DateModified", 
+                        "System.GPS.LatitudeRef", 
+                        "System.GPS.LatitudeDecimal", 
+                        "System.GPS.LongitudeRef", 
+                        "System.GPS.LongitudeDecimal", 
+                        "System.Photo.DateTaken", 
+                        "System.Photo.CameraManufacturer", 
+                        "System.Photo.CameraModel" 
+                    };
                     List<List<object>> temp = FilterColumns(IndexResults, selectedColumns);
                     int latIdx = temp[0].IndexOf("System.GPS.LatitudeDecimal");
                     int longIdx = temp[0].IndexOf("System.GPS.LongitudeDecimal");
@@ -2219,7 +2337,21 @@ namespace Windexter
                 }
                 if ((bool)SummaryCheck.IsChecked!)
                 {
-                    var selectedColumns = new List<string> { "WorkId", "System.Search.GatherTime", "System.DateCreated", "System.DateModified", "System.DateAccessed", "System.ItemPathDisplay", "System.FileName", "System.Size", "System.Search.AutoSummary", "System.KindText", "System.IsDeleted", "System.ItemType" };
+                    var selectedColumns = new List<string>
+                    { 
+                        "WorkId", 
+                        "System.Search.GatherTime", 
+                        "System.DateCreated", 
+                        "System.DateModified", 
+                        "System.DateAccessed", 
+                        "System.ItemPathDisplay", 
+                        "System.FileName", 
+                        "System.Size", 
+                        "System.Search.AutoSummary", 
+                        "System.KindText", 
+                        "System.IsDeleted", 
+                        "System.ItemType" 
+                    };
                     List<List<object>> temp = FilterColumns(IndexResults, selectedColumns);
                     int summaryIdx = temp[0].IndexOf("System.Search.AutoSummary");
                     if (summaryIdx > 0)
@@ -2237,7 +2369,17 @@ namespace Windexter
                 }
                 if ((bool)CompInfoCheck.IsChecked!)
                 {
-                    var selectedColumns = new List<string> { "WorkId", "System.Search.GatherTime", "System.VolumeId", "System.ComputerName", "System.DateCreated", "System.DateModified", "System.DateAccessed", "System.ItemType" };
+                    var selectedColumns = new List<string>
+                    { 
+                        "WorkId", 
+                        "System.Search.GatherTime", 
+                        "System.VolumeId", 
+                        "System.ComputerName", 
+                        "System.DateCreated", 
+                        "System.DateModified", 
+                        "System.DateAccessed", 
+                        "System.ItemType" 
+                    };
                     List<List<object>> temp = FilterColumns(IndexResults, selectedColumns);
                     int itemTypeIdx = temp[0].IndexOf("System.ItemType");
                     if (itemTypeIdx > 0)
@@ -2256,7 +2398,25 @@ namespace Windexter
                 }
                 if ((bool)ActivityCheck.IsChecked!)
                 {
-                    var selectedColumns = new List<string> { "WorkId", "System.Search.GatherTime", "System.ComputerName", "System.VolumeId", "System.DateModified", "System.ActivityHistory.StartTime", "System.ActivityHistory.EndTime", "System.ItemNameDisplay", "System.ItemUrl", "System.Activity.AppDisplayName", "System.Activity.ContentUri", "System.Activity.DisplayText", "System.Activity.Description", "System.ActivityHistory.AppId", "System.ActivityHistory.AppIdList", "System.ItemType" };
+                    var selectedColumns = new List<string>
+                    { 
+                        "WorkId", 
+                        "System.Search.GatherTime", 
+                        "System.ComputerName", 
+                        "System.VolumeId", 
+                        "System.DateModified", 
+                        "System.ActivityHistory.StartTime", 
+                        "System.ActivityHistory.EndTime", 
+                        "System.ItemNameDisplay", 
+                        "System.ItemUrl", 
+                        "System.Activity.AppDisplayName", 
+                        "System.Activity.ContentUri", 
+                        "System.Activity.DisplayText", 
+                        "System.Activity.Description", 
+                        "System.ActivityHistory.AppId", 
+                        "System.ActivityHistory.AppIdList", 
+                        "System.ItemType" 
+                    };
                     List<List<object>> temp = FilterColumns(IndexResults, selectedColumns);
                     int itemTypeIdx = temp[0].IndexOf("System.ItemType");
                     if (itemTypeIdx > 0)
@@ -2322,7 +2482,6 @@ namespace Windexter
                     }
                     raw.sqlite3_finalize(stm);
                     stm = null!;
-
                     if (tables.Contains("SystemIndex_Gthr"))
                     {
                         dbType = "gather";
@@ -2352,7 +2511,6 @@ namespace Windexter
                         }
                         raw.sqlite3_finalize(stmt_path);
                         stmt_path = null!;
-
                         resolvedPaths = BuildFullPaths(paths);
                     }
                     else if (tables.Contains("CatalogStorageManager"))
@@ -2376,6 +2534,11 @@ namespace Windexter
                         sql = $"SELECT * FROM {propTable}";
                         properties = ReadAndStoreTable(db, sql);
                     }
+                    else if (tables.Contains("PropertyMap"))
+                    {
+                        sql = $"SELECT * FROM PropertyMap";
+                        propertyMap = ReadAndStoreTable(db, sql);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -2387,6 +2550,7 @@ namespace Windexter
                     if (stmt_path != null) raw.sqlite3_finalize(stmt_path);
                     if (cat_stmt != null) raw.sqlite3_finalize(cat_stmt);
                     if (db != null) raw.sqlite3_close(db);
+                    tables.Clear();
                 }
             }
             else if (dbFile.EndsWith(".edb"))
@@ -2437,6 +2601,7 @@ namespace Windexter
                     {
                         properties.Add(row);
                     }
+                    tables.Clear();
                 }
                 catch (Exception ex)
                 {
@@ -2740,9 +2905,9 @@ namespace Windexter
         }
 
         public static string Decompress7Bit(byte[] data)
+        /// https://www.3gpp.org/ftp/Specs/archive/23_series/23.038 Para 6, SMS Packing
+        /// https://doubleblak.com/blogPost.php?k=7bitpdu
         {
-            /// https://www.3gpp.org/ftp/Specs/archive/23_series/23.038 Para 6, SMS Packing
-            /// https://doubleblak.com/blogPost.php?k=7bitpdu
             if (data == null || data.Length <= 1)
                 return string.Empty;
             StringBuilder sb = new();
@@ -3173,7 +3338,8 @@ namespace Windexter
         public static class SPSParser
         /// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-propstore/3453fb82-0e4f-4c2c-bc04-64b4bd2c51ec
         /// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-oleps/f122b9d7-e5cf-4484-8466-83f6fd94b3cc
-        /// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-oaut/5a2b34c4-d109-438e-9ec8-84816d8de40d - 0x06 Currency
+        /// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-oaut/5a2b34c4-d109-438e-9ec8-84816d8de40d
+        /// CodePage Property Id? - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-oleps/04727953-c174-4d01-80ae-b38b15d7068a
         {
             public static List<SerializedPropertyStore> Parse(byte[] blob)
             {
@@ -3185,7 +3351,6 @@ namespace Windexter
                 if (reader.BaseStream.Position < reader.BaseStream.Length - 4)
                 {
                     if (firstBytes == 1)
-                    // CodePage Property Id? - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-oleps/04727953-c174-4d01-80ae-b38b15d7068a
                     {
                         reader.ReadInt32();
                         List<string> dataStrings = [];
@@ -3205,7 +3370,7 @@ namespace Windexter
                         stores.Add(store);
                         return stores;
                     }
-                    int storeSize = reader.ReadInt32(); // needs check for position and length, or position not equal to length or position + 4 not greater than length.
+                    int storeSize = reader.ReadInt32();
                     long endPos = reader.BaseStream.Position - 4 + storeSize;
                     while (reader.BaseStream.Position < endPos)
                     {
@@ -3336,6 +3501,7 @@ namespace Windexter
                     _ => $"[Unsupported VT {vt:X}"
                 };
             }
+
             private static string ReadVectorLpwstr(BinaryReader reader)
             {
                 // 2-byte buffers of null at the end of each property
@@ -3363,14 +3529,15 @@ namespace Windexter
                             }
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        //TODO
+                        throw new InvalidOperationException($"An error has occurred while attempting to read a VectorLpwstr:\n\n{ex.Message}");
                     }
                 }
                 string stringVal = string.Join(" ", result);
                 return stringVal;
             }
+
             private static string ReadVersionedStream(BinaryReader reader)
             {
                 var guid = new Guid(reader.ReadBytes(16));
@@ -3383,13 +3550,14 @@ namespace Windexter
                 return $"{guid} - {streamName}";
 
             }
+
             private static string ReadClipboardData(BinaryReader reader)
             {
                 int length = reader.ReadInt32();
-                //var format = reader.ReadInt32();
                 var bytes = reader.ReadBytes(length);
                 return Encoding.Unicode.GetString(bytes).TrimEnd('\0');
             }
+
             private static string ReadUnicodeString(BinaryReader reader, bool dbl)
             {
                 int length = reader.ReadInt32();
@@ -3407,12 +3575,14 @@ namespace Windexter
                 var bytes = reader.ReadBytes(length);
                 return Encoding.ASCII.GetString(bytes).TrimEnd('\0');
             }
+
             private static string ReadBlob(BinaryReader reader)
             {
                 int length = reader.ReadInt32();
                 var bytes = reader.ReadBytes((int)length);
                 return BitConverter.ToString(bytes).Replace("-", "").TrimEnd('\0');
             }
+
             public static decimal ReadDecimal(BinaryReader reader)
             {
                 byte[] bytes = reader.ReadBytes(16);
@@ -3568,18 +3738,15 @@ namespace Windexter
         // Error handling
         [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_error_free(ref IntPtr error);
-        // Compression
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int libesedb_compression_7bit_decompress_get_size(byte[] compressed_data, UIntPtr compressed_data_size, out UIntPtr uncompressed_data_size, IntPtr error);
+        // Compression - not yet available
+        // [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        // private static extern int libesedb_compression_7bit_decompress_get_size(byte[] compressed_data, UIntPtr compressed_data_size, out UIntPtr uncompressed_data_size, IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int libesedb_compression_7bit_decompress(byte[] compressed_data, UIntPtr compressed_data_size, byte[] uncompressed_data, UIntPtr uncompressed_data_size, IntPtr error);
+        // [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        // private static extern int libesedb_compression_7bit_decompress(byte[] compressed_data, UIntPtr compressed_data_size, byte[] uncompressed_data, UIntPtr uncompressed_data_size, IntPtr error);
 
         #endregion
 
-        /// <summary>
-        /// Opens an ESE database file
-        /// </summary>
         public void Open(string databasePath)
         {
             if (_isOpen)
@@ -3750,7 +3917,6 @@ namespace Windexter
         }
 
         #region Helper Methods
-
         private IntPtr GetTableHandle(string tableName)
         {
             int result = libesedb_file_get_number_of_tables(_fileHandle, out int numberOfTables, out nint error);
@@ -3801,7 +3967,6 @@ namespace Windexter
             return Encoding.UTF8.GetString(nameBuffer).TrimEnd('\0');
         }
 
-
         private static List<object> ReadRecord(IntPtr recordHandle, List<string> columnNames)
         {
             var row = new List<object>();
@@ -3818,29 +3983,8 @@ namespace Windexter
             return row;
         }
 
-        ///public enum EseColumnType : uint
-        ///{
-            ///Nil = 0,
-            ///Bit = 1,
-            ///UnsignedByte = 2,
-            ///Short = 3,
-            ///Long = 4,
-            ///Currency = 5,
-            ///IEEESingle = 6,
-            ///IEEEDouble = 7,
-            ///DateTime = 8,
-            ///Binary = 9,
-            ///Text = 10,
-            ///LongBinary = 11,
-            ///LongText = 12,
-            ///GUID = 16
-        ///}
-
         private static object? GetRecordValue(IntPtr recordHandle, int valueIndex)
         {
-            //int isLong = libesedb_record_is_long_value(recordHandle, valueIndex, out nint error);
-            //int isMulti = libesedb_record_is_multi_value(recordHandle, valueIndex, out error);
-
             int result = libesedb_record_get_column_type(recordHandle, valueIndex, out uint columnType, out nint error);
             if (result != 1)
                 return null;
@@ -3875,20 +4019,7 @@ namespace Windexter
                 result = libesedb_record_get_value_data(recordHandle, valueIndex, dataBuffer, valueSize, out error);
                 if (result == 1)
                 {
-                    //result = libesedb_compression_7bit_decompress_get_size(dataBuffer, (UIntPtr)dataBuffer.Length, out UIntPtr uncompressedSize, IntPtr.Zero);
-                    //if (result == 1)
-                    //{
-                        //byte[] uncompressedData = new byte[(int)uncompressedSize];
-                        //result = libesedb_compression_7bit_decompress(dataBuffer, (UIntPtr)dataBuffer.Length, uncompressedData, uncompressedSize, IntPtr.Zero);
-                        //if (result == 1)
-                        //{
-                            //return uncompressedData;
-                        //}
-                    //}
-                    //else
-                    //{
-                        return dataBuffer;
-                    //}
+                    return dataBuffer;
                 }
             }
             return null;
