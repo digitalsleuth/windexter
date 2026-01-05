@@ -40,21 +40,21 @@ namespace Windexter
         private static bool GatherAvailable = false;
         private static bool PropMapAvailable = false;
         private static List<List<object>> IndexResults = [];
-        private static List<List<object>> IndexProperties = [];
-        private static List<List<object>> URLResults = [];
-        private static List<List<object>> GPSResults = [];
-        private static List<List<object>> SummaryResults = [];
-        private static List<List<object>> CompInfoResults = [];
-        private static List<List<object>> ActivityResults = [];
-        private static List<List<object>> EseResults = [];
+        //private static List<List<object>> IndexProperties = [];
+        private static readonly List<List<object>> URLResults = [];
+        private static readonly List<List<object>> GPSResults = [];
+        private static readonly List<List<object>> SummaryResults = [];
+        private static readonly List<List<object>> CompInfoResults = [];
+        private static readonly List<List<object>> ActivityResults = [];
+        private static readonly List<List<object>> EseResults = [];
         private static List<List<object>> Timeline = [];
-        private static List<List<object>> PropertyMapResults = [];
+        private static readonly List<List<object>> PropertyMapResults = [];
         private static readonly List<string> tables = [];
         private static List<List<object>> properties = [];
         private static List<List<object>> propertyStore = [];
         private static List<List<object>> propertyMetadata = [];
         private static List<List<object>> propertyMap = [];
-        private static Dictionary<string, string> eseProps = [];
+        private static readonly Dictionary<string, string> eseProps = [];
         private static readonly List<string> lookups = [
             "System.FlagColor",
             "System.Calendar.ResponseStatus",
@@ -414,7 +414,6 @@ namespace Windexter
             (549755813889, "Huge"),
             (1099511627777, "Gigantic")
         ];
-
 
         public static readonly Dictionary<string, Dictionary<int, string>> LookupValues = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -1876,7 +1875,7 @@ namespace Windexter
             OutputPathPicker.IsEnabled = true;
             SelectDeselectButton.Content = "Select All";
             SelectDeselectButton.IsEnabled = true;
-            IndexProperties.Clear();
+            //IndexProperties.Clear();
             IndexResults.Clear();
             GatherResults.Clear();
             URLResults.Clear();
@@ -1915,7 +1914,7 @@ namespace Windexter
             OutputPathPicker.IsEnabled = false;
             rows.Clear();
             paths.Clear();
-            IndexProperties.Clear();
+            //IndexProperties.Clear();
             IndexResults.Clear();
             GatherResults.Clear();
             URLResults.Clear();
@@ -1971,9 +1970,18 @@ namespace Windexter
                             ResetUI();
                             return;
                         }
+                        else if (result == MessageBoxResult.No)
+                        {
+                            GatherAvailable = false;
+                        }
                     }
-                    var propPath = string.Concat(Path.GetDirectoryName(dbFile), "\\Projects\\SystemIndex\\PropMap\\PropMap.db");
-                    PropMapAvailable = File.Exists(propPath);
+                    string[] currentDirFiles = Directory.GetFiles(Path.GetDirectoryName(dbFile)!, "PropMap.db", SearchOption.AllDirectories);
+                    var propPath = "";
+                    if (currentDirFiles.Length > 0)
+                    {
+                        propPath = currentDirFiles[0];
+                        PropMapAvailable = true;
+                    }
                     if (PropMapAvailable)
                     {
                         MessageBoxResult result = System.Windows.MessageBox.Show("Windexter has found a PropMap.db in a sub-directory of the selected folder.\n\nDo you want to process this as well?", "PropMap.db exists! Process?", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
@@ -1987,6 +1995,10 @@ namespace Windexter
                         {
                             ResetUI();
                             return;
+                        }
+                        else if (result == MessageBoxResult.No)
+                        {
+                            PropMapAvailable = false;
                         }
                     }
                 }
@@ -2002,7 +2014,7 @@ namespace Windexter
                 var AllResults = new Dictionary<string, List<List<object>>>
                 {
                     ["Indexed Results"] = IndexResults,
-                    ["Index Properties"] = IndexProperties,
+                    //["Index Properties"] = IndexProperties,
                     ["Gather Data"] = GatherResults,
                     ["URL Data"] = URLResults,
                     ["GPS Data"] = GPSResults,
@@ -2093,7 +2105,7 @@ namespace Windexter
                     if (dbType == "esedb")
                     {
                         GetEsePropertyStore();
-                        GetEseProperties();
+                        //GetEseProperties();
                     }
                 }
                 catch (Exception ex)
@@ -2701,7 +2713,7 @@ namespace Windexter
         private static void GetEseProperties()
         {
             var header = properties[0];
-            IndexProperties = [header];
+            //IndexProperties = [header];
             foreach (var entry in properties.Skip(1))
             {
                 var row = new List<object> { };
@@ -2716,7 +2728,7 @@ namespace Windexter
                     }
                     row.Add(value);
                 }
-                IndexProperties.Add(row);
+                //IndexProperties.Add(row);
             }
         }
 
@@ -2747,18 +2759,22 @@ namespace Windexter
                         }
                         if (value is byte[] bytes)
                         {
-                            if (bytes.Length == 8 && dateTimes.Contains(colName.ToString()!))
+                            if (bytes.Length == 8 && bytes.All(b => b == 0x2A))
+                            {
+                                value = null!;
+                            }
+                            else if (bytes.Length == 8 && dateTimes.Contains(colName.ToString()!))
                             {
                                 try
                                 {
                                     long fileTime = BitConverter.ToInt64(bytes, 0);
-                                    if (fileTime <= futureTicks & fileTime > 0)
+                                    if (fileTime <= futureTicks && fileTime > 116444736000000000)
                                     {
                                         value = DateTime.FromFileTimeUtc(fileTime).ToString("yyyy-MM-dd HH:mm:ss");
                                     }
                                     else
                                     {
-                                        value = BitConverter.ToString(bytes).Replace("-", "");
+                                        value = "";
                                     }
                                 }
                                 catch
@@ -2783,15 +2799,9 @@ namespace Windexter
                             }
                             else if (colName.ToString()!.Equals("System.Size", StringComparison.OrdinalIgnoreCase))
                             {
-                                if (bytes.Length == 8 && !bytes.All(b => b == 0x2A))
-                                {
-                                    long fileSize = BitConverter.ToInt64(bytes, 0);
-                                    value = fileSize;
-                                }
-                                else
-                                {
-                                    value = null!;
-                                }
+                                long fileSize = BitConverter.ToInt64(bytes, 0);
+                                value = fileSize;
+
                             }
                             else if (colName.ToString()!.Equals("InvertedOnlyPids", StringComparison.OrdinalIgnoreCase))
                             {
@@ -2836,7 +2846,22 @@ namespace Windexter
                                 Guid guid = new((string)value);
                                 value = guid.ToString("B").ToUpper();
                             }
+                            else if (lookups.Contains(colName.ToString()!) && value is not null)
+                            {
+                                if (LookupValues.TryGetValue(colName.ToString()!, out var lookup))
+                                {
+                                    value = BitConverter.ToInt16(bytes, 0);
+                                    if (lookup.TryGetValue((short)value, out string? strValue))
+                                    {
+                                        value = strValue;
+                                    }
+                                }
+                            }
                             else if (bytesToString.Contains(colName.ToString()!))
+                            {
+                                value = BitConverter.ToString(bytes).Replace("-", "");
+                            }
+                            else
                             {
                                 value = BitConverter.ToString(bytes).Replace("-", "");
                             }
@@ -2862,20 +2887,6 @@ namespace Windexter
                             List<string> flags = GetMatchingFlags((uint)value, FileAttributes);
                             value = string.Join("|", flags);
                         }
-                        if (lookups.Contains(colName.ToString()!) && value is not null)
-                        {
-                            if (LookupValues.TryGetValue(colName.ToString()!, out var lookup))
-                            {
-                                if (value is byte[] lookupBytes)
-                                {
-                                    value = BitConverter.ToInt16(lookupBytes, 0);
-                                    if (lookup.TryGetValue((short)value, out string? strValue))
-                                    {
-                                        value = strValue;
-                                    }
-                                }
-                           }
-                        }
                         if (colName.ToString()!.Equals("System.Capacity", StringComparison.OrdinalIgnoreCase) && value is not null)
                         {
                             string capacityName = GetMeasurementName((ulong)value, Capacity);
@@ -2885,10 +2896,6 @@ namespace Windexter
                         {
                             List<string> matches = GetMatchingFlags((uint)value, MessageFlags);
                             value = string.Join("|", matches);
-                        }
-                        if (value is byte[] remainingBytes)
-                        {
-                            value = BitConverter.ToString(remainingBytes).Replace("-", "");
                         }
                         row.Add(value!);
                     }
@@ -2975,18 +2982,22 @@ namespace Windexter
                             }
                             if (value is byte[] bytes)
                             {
-                                if (bytes.Length == 8 && dateTimes.Contains(colName.ToString()!))
+                                if (bytes.Length == 8 && bytes.All(b => b == 0x2A))
+                                {
+                                    value = null!;
+                                }
+                                else if (bytes.Length == 8 && dateTimes.Contains(colName.ToString()!))
                                 {
                                     try
                                     {
                                         long fileTime = BitConverter.ToInt64(bytes, 0);
-                                        if (fileTime <= futureTicks & fileTime > 0)
+                                        if (fileTime <= futureTicks && fileTime > 116444736000000000)
                                         {
                                             value = DateTime.FromFileTimeUtc(fileTime).ToString("yyyy-MM-dd HH:mm:ss");
                                         }
                                         else
                                         {
-                                            value = BitConverter.ToString(bytes).Replace("-", "");
+                                            value = "";
                                         }
                                     }
                                     catch
@@ -3258,41 +3269,6 @@ namespace Windexter
             return value.ToString() ?? string.Empty;
         }
 
-        public static List<string> ExtractUnicodeText(byte[] data, int minCharLength = 6)
-        {
-            var results = new List<string>();
-
-            for (int i = 0; i < data.Length - 2; i += 2)
-            {
-                if (data[i + 1] == 0 && data[i] >= 0x20 && data[i] <= 0x7E)
-                {
-                    int start = i;
-                    int length = 0;
-                    while (i + 1 < data.Length)
-                    {
-                        byte lo = data[i];
-                        byte hi = data[i + 1];
-                        if (hi == 0 && lo >= 0x20 && lo <= 0x7E)
-                        {
-                            length += 2;
-                            i += 2;
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                    if (length >= minCharLength * 2)
-                    {
-                        string decoded = Encoding.Unicode.GetString(data, start, length);
-                        results.Add(decoded);
-                    }
-                    i = start + length;
-                }
-            }
-            return results;
-        }
-
         private static List<List<object>> FilterColumns(List<List<object>> source, List<string> desiredColumns)
         {
             if (source == null || source.Count == 0)
@@ -3463,6 +3439,7 @@ namespace Windexter
 
             private static object? ReadPropertyValue(BinaryReader reader, int vt)
             {
+                /// Not all VT's are set here because they are not all used in the Windows Search Index.
                 return vt switch
                 {
                     0x00 => null, // VT_EMPTY
@@ -3487,7 +3464,7 @@ namespace Windexter
                     0x17 => reader.ReadUInt32(), // VT_UINT
                     0x1E => ReadString(reader), // VT_LPSTR
                     0x1F => ReadUnicodeString(reader, true), // VT_LPWSTR
-                    0x40 => DateTime.FromFileTimeUtc(reader.ReadInt64()), // VT_FILETIME
+                    0x40 => ReadFileTime(reader), // VT_FILETIME
                     0x41 => ReadBlob(reader), // VT_BLOB
                     0x42 => ReadUnicodeString(reader, true), // VT_STREAM
                     0x43 => ReadUnicodeString(reader, true), // VT_STORAGE
@@ -3495,11 +3472,21 @@ namespace Windexter
                     0x45 => ReadUnicodeString(reader, true), // VT_STORED_Object
                     0x46 => ReadBlob(reader), // VT_BLOB_Object
                     0x47 => ReadClipboardData(reader), // VT_CF
-                    0x48 => new Guid(reader.ReadBytes(16)), // VT_CLSID
+                    0x48 => ReadGuid(reader), // VT_CLSID
                     0x49 => ReadVersionedStream(reader), // VT_VERSIONED_STREAM
                     0x101F => ReadVectorLpwstr(reader), // VT_VECTOR | VT_LPWSTR
                     _ => $"[Unsupported VT {vt:X}"
                 };
+            }
+
+            private static DateTime ReadFileTime(BinaryReader reader)
+            {
+                return DateTime.FromFileTimeUtc(reader.ReadInt64());
+            }
+
+            private static Guid ReadGuid(BinaryReader reader)
+            {
+                return new Guid(reader.ReadBytes(16));
             }
 
             private static string ReadVectorLpwstr(BinaryReader reader)
@@ -3976,7 +3963,6 @@ namespace Windexter
 
             for (int i = 0; i < numberOfValues && i < columnNames.Count; i++)
             {
-                string columnName = columnNames[i];
                 object? value = GetRecordValue(recordHandle, i);
                 row.Add(value!);
             }
@@ -3985,7 +3971,7 @@ namespace Windexter
 
         private static object? GetRecordValue(IntPtr recordHandle, int valueIndex)
         {
-            int result = libesedb_record_get_column_type(recordHandle, valueIndex, out uint columnType, out nint error);
+            int result = libesedb_record_get_column_type(recordHandle, valueIndex, out _, out nint error);
             if (result != 1)
                 return null;
 

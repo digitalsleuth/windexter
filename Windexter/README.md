@@ -9,7 +9,7 @@ win-dex-ter (ˈwɪndɛkstə˞r)
 
 ## What Windexter Does
 
-Windexter analyzes the contents of a `Windows.edb` (ESE database), `Windows.db` (SQLite database), or `Windows-gather.db` (SQLite database) and provides a legible output for forensic analysis in the form of an Excel spreadsheet.
+Windexter analyzes the contents of a `Windows.edb` (ESE database), `Windows.db` (SQLite database), or `Windows-gather.db` (SQLite database) and provides a legible output for forensic analysis in the form of an Excel spreadsheet.  
 
 The spreadsheet will contain anywhere from one to 9 tabs, based on the database provided and the options selected:
 
@@ -18,10 +18,6 @@ The spreadsheet will contain anywhere from one to 9 tabs, based on the database 
 ### Indexed Results
 
 Contains the contents of the main SystemIndex_1_PropertyStore table, correlated (when available within the database) with the SystemIndex_Gthr and SystemIndex_GthrPth tables.
-
-### Index Properties
-
-Contains the contents of the SystemIndex_1_Properties table, when present (usually in the ESE database).
 
 ### Gather Data
 
@@ -50,6 +46,10 @@ Contains the filtered contents of the Indexed Results tab which shows only the S
 ### Timeline
 
 Contains the entirety of the Indexed Results tab, but displaying all timestamps in a single column, based on their Source (ie. System.DateCreated, System.Search.GatherTime, etc). Easily filtered and sorted.
+
+### PropertyMap
+
+Contains the parsed content of the PropMap.db file (when present) within the provided directory.
 
 ## Usage
 

@@ -19,10 +19,6 @@ The spreadsheet will contain anywhere from one to 9 tabs, based on the database 
 
 Contains the contents of the main SystemIndex_1_PropertyStore table, correlated (when available within the database) with the SystemIndex_Gthr and SystemIndex_GthrPth tables.
 
-### Index Properties
-
-Contains the contents of the SystemIndex_1_Properties table, when present (usually in the ESE database).
-
 ### Gather Data
 
 Contains a correlation between the SystemIndex_Gthr and SystemIndex_GthrPth tables to display the full path for a file or folder, as well as the metadata which goes along with it.
@@ -50,6 +46,10 @@ Contains the filtered contents of the Indexed Results tab which shows only the S
 ### Timeline
 
 Contains the entirety of the Indexed Results tab, but displaying all timestamps in a single column, based on their Source (ie. System.DateCreated, System.Search.GatherTime, etc). Easily filtered and sorted.
+
+### PropertyMap
+
+Contains the parsed content of the PropMap.db file (when present) within the provided directory.
 
 ## Usage
 
