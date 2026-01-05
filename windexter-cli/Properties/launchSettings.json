@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "windexter-cli Test 1": {
+      "commandName": "Project",
+      "commandLineArgs": "-f O:\\windexter\\Samples\\Local\\Windows.db --all --gather --propmap",
+      "workingDirectory": "O:\\windexter\\Samples"
+    }
+  }
+}
