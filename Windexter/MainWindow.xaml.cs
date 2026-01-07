@@ -1952,7 +1952,10 @@ namespace Windexter
                 await Task.Yield();
                 await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
                 StatusBox.Text = "Extracting data ...";
-                await Task.Run(() => ExtractData());
+                if (!await Task.Run(() => ExtractData()))
+                {
+                    return;
+                }
                 if (!dbFile.Contains("gather") && dbType == "index")
                 {
                     GatherAvailable = File.Exists(dbFile.Replace("Windows.db", "Windows-gather.db"));
@@ -1962,7 +1965,10 @@ namespace Windexter
                         if (result == MessageBoxResult.Yes)
                         {
                             dbFile = dbFile.Replace("Windows.db", "Windows-gather.db");
-                            await Task.Run(() => ExtractData());
+                            if (!await Task.Run(() => ExtractData()))
+                            {
+                                return;
+                            }
                             dbType = "index";
                         }
                         else if (result == MessageBoxResult.Cancel)
@@ -1988,7 +1994,10 @@ namespace Windexter
                         if (result == MessageBoxResult.Yes)
                         {
                             dbFile = propPath;
-                            await Task.Run(() => ExtractData());
+                            if (!await Task.Run(() => ExtractData()))
+                            {
+                                return;
+                            }
                             dbType = "index";
                         }
                         else if (result == MessageBoxResult.Cancel)
@@ -2004,7 +2013,10 @@ namespace Windexter
                 }
                 outputFile = Path.Combine(OutputPath.Text, $"WINDOWS-SEARCH-{dbType.ToUpper()}-{now}.xlsx");
                 StatusBox.Text = "Parsing data ...";
-                await ParseDataAsync();
+                if (!await ParseDataAsync())
+                {
+                    return;
+                }
                 StatusBox.Text = "Exporting to XLSX...";
                 bool cbsChecked = AnyCheckBoxChecked(MainGrid);
                 if (cbsChecked)
@@ -2067,8 +2079,9 @@ namespace Windexter
             return false;
         }
 
-        private async Task ParseDataAsync()
+        private async Task<bool> ParseDataAsync()
         {
+            bool result = false;
             DateTime nowDt = DateTime.Now.ToUniversalTime();
             string now = nowDt.ToString("yyyyMMdd-HHmmss");
             if (dbType == "index")
@@ -2077,23 +2090,34 @@ namespace Windexter
                 {
                     try
                     {
-                        await Task.Run(() => GetIndexPropertyStore(propertyStore, propertyMetadata));
+                        if (!await Task.Run(() => GetIndexPropertyStore(propertyStore, propertyMetadata)))
+                        {
+                            return false;
+                        }
                         if (GatherAvailable)
                         {
-                            ParseGatherData();
+                            if (!ParseGatherData())
+                            {
+                                return false;
+                            }
                             GatherAvailable = false;
                         }
                         if (PropMapAvailable)
                         {
-                            ParsePropertyMap();
+                            if (!ParsePropertyMap())
+                            {
+                                return false;
+                            }
                             PropMapAvailable = false;
                         }
+                        result = true;
                     }
                     catch (Exception ex)
                     {
                         App.Current.MainWindow.Activate();
                         System.Windows.MessageBox.Show($"Unable to parse Index database:\n\n{ex.Message}", "Index Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
                         GoButton.IsEnabled = true;
+                        result = false;
                     }
                 }
             }
@@ -2101,24 +2125,34 @@ namespace Windexter
             {
                 try
                 {
-                    ParseGatherData();
+                    if (!ParseGatherData())
+                    {
+                        return false;
+                    }
                     if (dbType == "esedb")
                     {
-                        GetEsePropertyStore();
+                        if (!GetEsePropertyStore())
+                        {
+                            return false;
+                        }
                         //GetEseProperties();
                     }
+                    result = true;
                 }
                 catch (Exception ex)
                 {
                     App.Current.MainWindow.Activate();
                     System.Windows.MessageBox.Show($"Unable to parse Gather Data:\n\n{ex.Message}", "Gather Data Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     GoButton.IsEnabled = true;
+                    result = false;
                 }
             }
+            return result;
         }
 
-        private void ParseGatherData()
+        private bool ParseGatherData()
         {
+            bool status = false;
             DateTime nowDt = DateTime.Now.ToUniversalTime();
             string now = nowDt.ToString("yyyyMMdd-HHmmss");
             try
@@ -2187,46 +2221,70 @@ namespace Windexter
                             {
                                 value = singleByteArr[0];
                             }
-                            newRow.Add(value);
+                            else if (colName == "TransactionExtendedFlags" && value is not null && value.GetType() == typeof(uint) && (uint)value == 707406378)
+                            {
+                                value = null!;
+                            }
+                            else if (colName == "TransactionExtendedFlags" && value is not null && value.GetType() == typeof(long) && (long)value == 3038287259199220266)
+                            {
+                                value = null!;
+                            }
+                            newRow.Add(value!);
                         }
                         GatherResults.Add(newRow);
                     }
                 }
+                status = true;
             }
             catch (Exception ex)
             {
+                status = false;
                 App.Current.MainWindow.Activate();
                 System.Windows.MessageBox.Show($"Unable to parse Gather Data:\n\n{ex.Message}", "Gather Data Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 GoButton.IsEnabled = true;
             }
+            return status;
         }
 
-        private static void ParsePropertyMap()
+        private bool ParsePropertyMap()
         {
+            bool status;
             List<object> header = propertyMap[0];
             PropertyMapResults.Add(["Guid", "FormatId", "PropertyId", "StandardId", "MaxSize"]);
-            for (int i = 1; i < propertyMap.Count; i++)
+            try
             {
-                var row = propertyMap[i];
-                if (row.Count > 0)
+                for (int i = 1; i < propertyMap.Count; i++)
                 {
-                    var newRow = new List<object>();
-                    for (int j = 0; j < row.Count; j++)
+                    var row = propertyMap[i];
+                    if (row.Count > 0)
                     {
-                        object item = row[j];
-                        object value = item;
-                        string colName = header[j].ToString()!;
-                        if (colName == "FormatId")
+                        var newRow = new List<object>();
+                        for (int j = 0; j < row.Count; j++)
                         {
-                            value = BitConverter.ToString((byte[])value).Replace("-","");
-                            Guid guid = new((string)value);
-                            value = guid.ToString("B").ToUpper();
+                            object item = row[j];
+                            object value = item;
+                            string colName = header[j].ToString()!;
+                            if (colName == "FormatId")
+                            {
+                                value = BitConverter.ToString((byte[])value).Replace("-", "");
+                                Guid guid = new((string)value);
+                                value = guid.ToString("B").ToUpper();
+                            }
+                            newRow.Add(value);
                         }
-                        newRow.Add(value);
+                        PropertyMapResults.Add(newRow);
                     }
-                    PropertyMapResults.Add(newRow);
                 }
+                status = true;
             }
+            catch (Exception ex)
+            {
+                status = false;
+                App.Current.MainWindow.Activate();
+                System.Windows.MessageBox.Show($"Unable to parse Property Map:\n\n{ex.Message}", "Property Map Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                GoButton.IsEnabled = true;
+            }
+            return status;
         }
 
         private static async Task GenerateTimelineAsync()
@@ -2452,8 +2510,9 @@ namespace Windexter
             }
         }
 
-        private void ExtractData()
+        private bool ExtractData()
         {
+            bool result = false;
             if (dbFile.EndsWith(".db"))
             {
                 Batteries_V2.Init();
@@ -2534,7 +2593,7 @@ namespace Windexter
 
                         if (string.IsNullOrEmpty(propStoreTable) || string.IsNullOrEmpty(metaTable))
                         {
-                            return;
+                            return false;
                         }
 
                         sql = $"SELECT * FROM {propStoreTable}";
@@ -2551,9 +2610,11 @@ namespace Windexter
                         sql = $"SELECT * FROM PropertyMap";
                         propertyMap = ReadAndStoreTable(db, sql);
                     }
+                    result = true;
                 }
                 catch (Exception ex)
                 {
+                    result = false;
                     throw new Exception($"Unable to extract data:\n{ex}");
                 }
                 finally
@@ -2564,6 +2625,7 @@ namespace Windexter
                     if (db != null) raw.sqlite3_close(db);
                     tables.Clear();
                 }
+                return result;
             }
             else if (dbFile.EndsWith(".edb"))
             {
@@ -2614,14 +2676,17 @@ namespace Windexter
                         properties.Add(row);
                     }
                     tables.Clear();
+                    result = true;
                 }
                 catch (Exception ex)
                 {
                     App.Current.MainWindow.Activate();
                     System.Windows.MessageBox.Show($"Unable to extract data from ESE database:\n\n{ex.Message}", "Database Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     GoButton.IsEnabled = true;
+                    result = false;
                 }
             }
+            return result;
         }
 
         public static Dictionary<int, string> BuildEsePaths(List<object> gatherPaths)
@@ -2732,8 +2797,9 @@ namespace Windexter
             }
         }
 
-        private void GetEsePropertyStore()
+        private bool GetEsePropertyStore()
         {
+            bool status = false;
             try
             {
                 DateTime nowDt = DateTime.Now.ToUniversalTime();
@@ -2756,6 +2822,14 @@ namespace Windexter
                             {
                                 value = BitConverter.ToBoolean(boolBytes);
                             }
+                        }
+                        if (value is not null && value.GetType() == typeof(long) && (long)value == 3038287259199220266)
+                        {
+                            value = null!;
+                        }
+                        else if (value is not null && value.GetType() == typeof(uint) && (uint)value == 707406378)
+                        {
+                            value = null!;
                         }
                         if (value is byte[] bytes)
                         {
@@ -2901,14 +2975,16 @@ namespace Windexter
                     }
                     IndexResults.Add(row);
                 }
-
+                status = true;
             }
             catch (Exception ex)
             {
+                status = false;
                 App.Current.MainWindow.Activate();
                 System.Windows.MessageBox.Show($"Unable to read and correlate data:\n\n{ex.Message}", "Data Correlation Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 GoButton.IsEnabled = true;
             }
+            return status;
         }
 
         public static string Decompress7Bit(byte[] data)
@@ -2944,8 +3020,9 @@ namespace Windexter
             return sb.ToString();
         }
 
-        private void GetIndexPropertyStore(List<List<object>> propertyStore, List<List<object>> propertyMetadata)
+        private bool GetIndexPropertyStore(List<List<object>> propertyStore, List<List<object>> propertyMetadata)
         {
+            bool status = false;
             try
             {
                 DateTime nowDt = DateTime.Now.ToUniversalTime();
@@ -2979,6 +3056,14 @@ namespace Windexter
                             if (booleanField.Contains(colName.ToString()!))
                             {
                                 value = Convert.ToBoolean(value);
+                            }
+                            if (value is not null && value.GetType() == typeof(long) && (long)value == 3038287259199220266)
+                            {
+                                value = null!;
+                            }
+                            else if (value is not null && value.GetType() == typeof(uint) && (uint)value == 707406378)
+                            {
+                                value = null!;
                             }
                             if (value is byte[] bytes)
                             {
@@ -3055,33 +3140,33 @@ namespace Windexter
                                     value = BitConverter.ToString(bytes).Replace("-", "");
                                 }
                             }
-                            if (sfgaoField.Contains(colName.ToString()!))
+                            if (sfgaoField.Contains(colName.ToString()!) && value is not null)
                             {
                                 List<string> flags = GetMatchingFlags((long)value, SFGAO);
                                 value = string.Join("|", flags);
                             }
-                            if (colName.ToString()!.Equals("System.Activity.BackgroundColor", StringComparison.OrdinalIgnoreCase))
+                            if (colName.ToString()!.Equals("System.Activity.BackgroundColor", StringComparison.OrdinalIgnoreCase) && value is not null)
                             {
                                 uint colorVal = (uint)(long)value;
                                 Color c = Color.FromArgb((int)colorVal);
                                 value = $"{value} - ARGB({c.A},{c.R},{c.G},{c.B})";
                             }
-                            if (colName.ToString()!.Equals("System.FilePlaceholderStatus", StringComparison.OrdinalIgnoreCase))
+                            if (colName.ToString()!.Equals("System.FilePlaceholderStatus", StringComparison.OrdinalIgnoreCase) && value is not null)
                             {
                                 List<string> matches = GetMatchingFlags((long)value, FilePlaceholderStates);
                                 value = string.Join("|", matches);
                             }
-                            if (colName.ToString()!.Equals("System.FileAttributes", StringComparison.OrdinalIgnoreCase))
+                            if (colName.ToString()!.Equals("System.FileAttributes", StringComparison.OrdinalIgnoreCase) && value is not null)
                             {
                                 List<string> flags = GetMatchingFlags((long)value, FileAttributes);
                                 value = string.Join("|", flags);
                             }
-                            if (guids.Contains(colName.ToString()!))
+                            if (guids.Contains(colName.ToString()!) && value is not null)
                             {
                                 Guid guid = new((string)value);
                                 value = guid.ToString("B").ToUpper();
                             }
-                            if (lookups.Contains(colName.ToString()!))
+                            if (lookups.Contains(colName.ToString()!) && value is not null)
                             {
                                 if (LookupValues.TryGetValue(colName.ToString()!, out var lookup))
                                 {
@@ -3110,13 +3195,16 @@ namespace Windexter
                     }
                     IndexResults.Add(row);
                 }
+                status = true;
             }
             catch (Exception ex)
             {
+                status = false;
                 App.Current.MainWindow.Activate();
                 System.Windows.MessageBox.Show($"Unable to read and correlate data:\n\n{ex.Message}", "Data Correlation Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 GoButton.IsEnabled = true;
             }
+            return status;
         }
 
         private static Dictionary<int, string> BuildFullPaths(List<List<string>> paths)

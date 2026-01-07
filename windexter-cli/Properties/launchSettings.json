@@ -1,8 +1,23 @@
 {
   "profiles": {
-    "windexter-cli Test 1": {
+    "windexter-cli SQLite": {
       "commandName": "Project",
       "commandLineArgs": "-f O:\\windexter\\Samples\\Local\\Windows.db --all --gather --propmap",
+      "workingDirectory": "O:\\windexter\\Samples"
+    },
+    "windexter-cli ESE": {
+      "commandName": "Project",
+      "commandLineArgs": "-f O:\\windexter\\Samples\\Windows.edb --all --gather --propmap",
+      "workingDirectory": "O:\\windexter\\Samples"
+    },
+    "windexter-cli ESE no options": {
+      "commandName": "Project",
+      "commandLineArgs": "-f O:\\windexter\\Samples\\Windows.edb",
+      "workingDirectory": "O:\\windexter\\Samples"
+    },
+    "windexter-cli GATHER DB": {
+      "commandName": "Project",
+      "commandLineArgs": "-f O:\\windexter\\Samples\\Local\\Windows\\Windows-gather.db --all --gather --propmap",
       "workingDirectory": "O:\\windexter\\Samples"
     }
   }

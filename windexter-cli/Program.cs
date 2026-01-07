@@ -7,13 +7,14 @@ using System.Text;
 using System.Text.Json;
 using CommandLine;
 using CommandLine.Text;
+using Microsoft.Extensions.FileSystemGlobbing;
 using OfficeOpenXml;
 using SQLitePCL;
 
 namespace windexter_cli
 {
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    /// Interaction logic for Program.cs
     /// </summary>
     /// TODO:
     /// - Map PropMap.db Id's to .db Metadata and .edb PropertyStore Columns
@@ -23,8 +24,6 @@ namespace windexter_cli
 
     class Program
     {
-
-        //private static readonly Timer? elapsedTimer = new();
         private static readonly string displayName = "Windexter CLI";
         private static readonly string githubBinaryRepo = "https://github.com/digitalsleuth/windexter";
         private static readonly Version? appVersion = new(Assembly.GetExecutingAssembly().GetName().Version!.ToString(3));
@@ -1823,7 +1822,10 @@ namespace windexter_cli
             Console.WriteLine($"Output: {outputPath}");
             Console.WriteLine($"Command Line: {Environment.CommandLine}");
             Console.WriteLine("Extracting data ...");
-            await Task.Run(() => ExtractData());
+            if (!await Task.Run(() => ExtractData()))
+            {
+                return;
+            }
             if (!dbFile.Contains("gather") && dbType == "index")
             {
                 GatherAvailable = File.Exists(dbFile.Replace("Windows.db", "Windows-gather.db"));
@@ -1831,7 +1833,10 @@ namespace windexter_cli
                 {
                     Console.WriteLine("Windexter has found a Windows-gather.db in the same directory as the selected database and is processing it.");
                     dbFile = dbFile.Replace("Windows.db", "Windows-gather.db");
-                    await Task.Run(() => ExtractData());
+                    if (!await Task.Run(() => ExtractData()))
+                    {
+                        return;
+                    }
                     dbType = "index";
                 }
                 else
@@ -1849,7 +1854,10 @@ namespace windexter_cli
                 {
                     Console.WriteLine("Windexter has found a PropMap.db in a sub-directory of the selected folder and is processing it.");
                     dbFile = propPath;
-                    await Task.Run(() => ExtractData());
+                    if (!await Task.Run(() => ExtractData()))
+                    {
+                        return;
+                    }
                     dbType = "index";
                 }
                 else
@@ -1859,7 +1867,10 @@ namespace windexter_cli
             }
             outputFile = Path.Combine(outputPath!, $"WINDOWS-SEARCH-{dbType.ToUpper()}-{now}.xlsx");
             Console.WriteLine("Parsing data ...");
-            await ParseDataAsync();
+            if (!await ParseDataAsync())
+            {
+                return;
+            }
             if (anySubParserSelected)
             {
                 Console.WriteLine("Filtering data ...");
@@ -1905,8 +1916,9 @@ namespace windexter_cli
             return matches;
         }
 
-        private static async Task ParseDataAsync()
+        private static async Task<bool> ParseDataAsync()
         {
+            bool result = false;
             DateTime nowDt = DateTime.Now.ToUniversalTime();
             string now = nowDt.ToString("yyyyMMdd-HHmmss");
             if (dbType == "index")
@@ -1915,20 +1927,31 @@ namespace windexter_cli
                 {
                     try
                     {
-                        await Task.Run(() => GetIndexPropertyStore(propertyStore, propertyMetadata));
+                        if (!await Task.Run(() => GetIndexPropertyStore(propertyStore, propertyMetadata)))
+                        {
+                            return false;
+                        }
                         if (GatherAvailable)
                         {
-                            ParseGatherData();
+                            if (!ParseGatherData())
+                            {
+                                return false;
+                            }
                             GatherAvailable = false;
                         }
                         if (PropMapAvailable)
                         {
-                            ParsePropertyMap();
+                            if (!ParsePropertyMap())
+                            {
+                                return false;
+                            }
                             PropMapAvailable = false;
                         }
+                        result = true;
                     }
                     catch (Exception ex)
                     {
+                        result = false;
                         Console.WriteLine($"Unable to parse Index database:\n\n{ex.Message}");
                     }
                 }
@@ -1937,22 +1960,32 @@ namespace windexter_cli
             {
                 try
                 {
-                    ParseGatherData();
+                    if (!ParseGatherData())
+                    {
+                        return false;
+                    }
                     if (dbType == "esedb")
                     {
-                        GetEsePropertyStore();
+                        if (!GetEsePropertyStore())
+                        {
+                            return false;
+                        }
                         //GetEseProperties();
                     }
+                    result = true;
                 }
                 catch (Exception ex)
                 {
+                    result = false;
                     Console.WriteLine($"Unable to parse Gather Data:\n\n{ex.Message}");
                 }
             }
+            return result;
         }
 
-        private static void ParseGatherData()
+        private static bool ParseGatherData()
         {
+            bool status = false;
             DateTime nowDt = DateTime.Now.ToUniversalTime();
             string now = nowDt.ToString("yyyyMMdd-HHmmss");
             try
@@ -2021,44 +2054,66 @@ namespace windexter_cli
                             {
                                 value = singleByteArr[0];
                             }
-                            newRow.Add(value);
+                            else if (colName == "TransactionExtendedFlags" && value is not null && value.GetType() == typeof(uint) && (uint)value == 707406378)
+                            {
+                                value = null!;
+                            }
+                            else if (colName == "TransactionExtendedFlags" && value is not null && value.GetType() == typeof(long) && (long)value == 3038287259199220266)
+                            {
+                                value = null!;
+                            }
+                            newRow.Add(value!);
                         }
                         GatherResults.Add(newRow);
                     }
                 }
+                status = true;
             }
             catch (Exception ex)
             {
+                status = false;
                 Console.WriteLine($"Unable to parse Gather Data:\n\n{ex.Message}");
             }
+            return status;
         }
 
-        private static void ParsePropertyMap()
+        private static bool ParsePropertyMap()
         {
+            bool status;
             List<object> header = propertyMap[0];
             PropertyMapResults.Add(["Guid", "FormatId", "PropertyId", "StandardId", "MaxSize"]);
-            for (int i = 1; i < propertyMap.Count; i++)
+            try
             {
-                var row = propertyMap[i];
-                if (row.Count > 0)
+                for (int i = 1; i < propertyMap.Count; i++)
                 {
-                    var newRow = new List<object>();
-                    for (int j = 0; j < row.Count; j++)
+                    var row = propertyMap[i];
+                    if (row.Count > 0)
                     {
-                        object item = row[j];
-                        object value = item;
-                        string colName = header[j].ToString()!;
-                        if (colName == "FormatId")
+                        var newRow = new List<object>();
+                        for (int j = 0; j < row.Count; j++)
                         {
-                            value = BitConverter.ToString((byte[])value).Replace("-", "");
-                            Guid guid = new((string)value);
-                            value = guid.ToString("B").ToUpper();
+                            object item = row[j];
+                            object value = item;
+                            string colName = header[j].ToString()!;
+                            if (colName == "FormatId")
+                            {
+                                value = BitConverter.ToString((byte[])value).Replace("-", "");
+                                Guid guid = new((string)value);
+                                value = guid.ToString("B").ToUpper();
+                            }
+                            newRow.Add(value);
                         }
-                        newRow.Add(value);
+                        PropertyMapResults.Add(newRow);
                     }
-                    PropertyMapResults.Add(newRow);
                 }
+                status = true;
             }
+            catch
+            { 
+                status = false;
+                Console.WriteLine("Unable to parse the Property Map database.");
+            }
+            return status;
         }
 
         private static async Task GenerateTimelineAsync()
@@ -2284,8 +2339,9 @@ namespace windexter_cli
             }
         }
 
-        private static void ExtractData()
+        private static bool ExtractData()
         {
+            bool result = false;
             if (dbFile.EndsWith(".db"))
             {
                 Batteries_V2.Init();
@@ -2366,9 +2422,8 @@ namespace windexter_cli
 
                         if (string.IsNullOrEmpty(propStoreTable) || string.IsNullOrEmpty(metaTable))
                         {
-                            return;
+                            throw new Exception("Error processing one or more table - no data found!");
                         }
-
                         sql = $"SELECT * FROM {propStoreTable}";
                         propertyStore = ReadAndStoreTable(db, sql);
 
@@ -2383,10 +2438,12 @@ namespace windexter_cli
                         sql = $"SELECT * FROM PropertyMap";
                         propertyMap = ReadAndStoreTable(db, sql);
                     }
+                    result = true;
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception($"Unable to extract data:\n{ex}");
+                    Console.WriteLine($"Unable to extract data:\n{ex}");
+                    result = false;
                 }
                 finally
                 {
@@ -2396,6 +2453,7 @@ namespace windexter_cli
                     if (db != null) raw.sqlite3_close(db);
                     tables.Clear();
                 }
+                return result;
             }
             else if (dbFile.EndsWith(".edb"))
             {
@@ -2404,7 +2462,14 @@ namespace windexter_cli
                 {
                     rows.Clear();
                     using var reader = new LibEsedbReader();
-                    reader.Open(dbFile);
+                    try
+                    {
+                        reader.Open(dbFile);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception($"Unable to open {dbFile}\n\n{ex}");
+                    }
                     var allData = reader.ReadAllData();
                     var gatherPaths = allData["SystemIndex_GthrPth"];
                     var gatherData = allData["SystemIndex_Gthr"];
@@ -2446,12 +2511,15 @@ namespace windexter_cli
                         properties.Add(row);
                     }
                     tables.Clear();
+                    result = true;
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Unable to extract data from ESE database:\n\n{ex.Message}");
+                    result = false;
                 }
             }
+            return result;
         }
 
         public static Dictionary<int, string> BuildEsePaths(List<object> gatherPaths)
@@ -2561,8 +2629,9 @@ namespace windexter_cli
             }
         }
 
-        private static void GetEsePropertyStore()
+        private static bool GetEsePropertyStore()
         {
+            bool status = false;
             try
             {
                 DateTime nowDt = DateTime.Now.ToUniversalTime();
@@ -2585,6 +2654,14 @@ namespace windexter_cli
                             {
                                 value = BitConverter.ToBoolean(boolBytes);
                             }
+                        }
+                        if (value is not null && value.GetType() == typeof(long) && (long)value == 3038287259199220266)
+                        {
+                            value = null!;
+                        }
+                        else if (value is not null && value.GetType() == typeof(uint) && (uint)value == 707406378)
+                        {
+                            value = null!;
                         }
                         if (value is byte[] bytes)
                         {
@@ -2730,12 +2807,14 @@ namespace windexter_cli
                     }
                     IndexResults.Add(row);
                 }
-
+                status = true;
             }
             catch (Exception ex)
             {
+                status = false;
                 Console.WriteLine($"Unable to read and correlate data:\n\n{ex.Message}");
             }
+            return status;
         }
 
         public static string Decompress7Bit(byte[] data)
@@ -2771,8 +2850,9 @@ namespace windexter_cli
             return sb.ToString();
         }
 
-        private static void GetIndexPropertyStore(List<List<object>> propertyStore, List<List<object>> propertyMetadata)
+        private static bool GetIndexPropertyStore(List<List<object>> propertyStore, List<List<object>> propertyMetadata)
         {
+            bool status = false;
             try
             {
                 DateTime nowDt = DateTime.Now.ToUniversalTime();
@@ -2806,6 +2886,14 @@ namespace windexter_cli
                             if (booleanField.Contains(colName.ToString()!))
                             {
                                 value = Convert.ToBoolean(value);
+                            }
+                            if (value is not null && value.GetType() == typeof(long) && (long)value == 3038287259199220266)
+                            {
+                                value = null!;
+                            }
+                            else if (value is not null && value.GetType() == typeof(uint) && (uint)value == 707406378)
+                            {
+                                value = null!;
                             }
                             if (value is byte[] bytes)
                             {
@@ -2882,33 +2970,33 @@ namespace windexter_cli
                                     value = BitConverter.ToString(bytes).Replace("-", "");
                                 }
                             }
-                            if (sfgaoField.Contains(colName.ToString()!))
+                            if (sfgaoField.Contains(colName.ToString()!) && value is not null)
                             {
                                 List<string> flags = GetMatchingFlags((long)value, SFGAO);
                                 value = string.Join("|", flags);
                             }
-                            if (colName.ToString()!.Equals("System.Activity.BackgroundColor", StringComparison.OrdinalIgnoreCase))
+                            if (colName.ToString()!.Equals("System.Activity.BackgroundColor", StringComparison.OrdinalIgnoreCase) && value is not null)
                             {
                                 uint colorVal = (uint)(long)value;
                                 Color c = Color.FromArgb((int)colorVal);
                                 value = $"{value} - ARGB({c.A},{c.R},{c.G},{c.B})";
                             }
-                            if (colName.ToString()!.Equals("System.FilePlaceholderStatus", StringComparison.OrdinalIgnoreCase))
+                            if (colName.ToString()!.Equals("System.FilePlaceholderStatus", StringComparison.OrdinalIgnoreCase) && value is not null)
                             {
                                 List<string> matches = GetMatchingFlags((long)value, FilePlaceholderStates);
                                 value = string.Join("|", matches);
                             }
-                            if (colName.ToString()!.Equals("System.FileAttributes", StringComparison.OrdinalIgnoreCase))
+                            if (colName.ToString()!.Equals("System.FileAttributes", StringComparison.OrdinalIgnoreCase) && value is not null)
                             {
                                 List<string> flags = GetMatchingFlags((long)value, FileAttributes);
                                 value = string.Join("|", flags);
                             }
-                            if (guids.Contains(colName.ToString()!))
+                            if (guids.Contains(colName.ToString()!) && value is not null)
                             {
                                 Guid guid = new((string)value);
                                 value = guid.ToString("B").ToUpper();
                             }
-                            if (lookups.Contains(colName.ToString()!))
+                            if (lookups.Contains(colName.ToString()!) && value is not null)
                             {
                                 if (LookupValues.TryGetValue(colName.ToString()!, out var lookup))
                                 {
@@ -2937,11 +3025,14 @@ namespace windexter_cli
                     }
                     IndexResults.Add(row);
                 }
+                status = true;
             }
             catch (Exception ex)
             {
+                status = false;
                 Console.WriteLine($"Unable to read and correlate data:\n\n{ex.Message}");
             }
+            return status;
         }
 
         private static Dictionary<int, string> BuildFullPaths(List<List<string>> paths)
@@ -3406,158 +3497,177 @@ namespace windexter_cli
         #region P/Invoke Declarations
 
         // File operations
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern int libesedb_file_initialize(out IntPtr file, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern int libesedb_file_free(ref IntPtr file, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int libesedb_file_open(IntPtr file, byte[] filename, int access_flags, out IntPtr error);
+
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
         private static extern int libesedb_file_open_wide(IntPtr file, string filename, int access_flags, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_file_close(IntPtr file, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_file_get_number_of_tables(IntPtr file, out int number_of_tables, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_file_get_table(IntPtr file, int table_entry, out IntPtr table, out IntPtr error);
 
         // Table operations
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_free(ref IntPtr table, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_utf8_name_size(IntPtr table, out UIntPtr utf8_name_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_utf8_name(IntPtr table, byte[] utf8_name, UIntPtr utf8_name_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_number_of_columns(IntPtr table, out int number_of_columns, int flags, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_column(IntPtr table, int column_entry, out IntPtr column, int flags, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_number_of_records(IntPtr table, out int number_of_records, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_record(IntPtr table, int record_entry, out IntPtr record, out IntPtr error);
 
         // Column operations
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_column_free(ref IntPtr column, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_column_get_utf8_name_size(IntPtr column, out UIntPtr utf8_name_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_column_get_utf8_name(IntPtr column, byte[] utf8_name, UIntPtr utf8_name_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_column_get_type(IntPtr column, out uint column_type, out IntPtr error);
 
         // Record operations
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_free(ref IntPtr record, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_is_long_value(IntPtr record, int value_entry, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_is_multi_value(IntPtr record, int value_entry, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_number_of_values(IntPtr record, out int number_of_values, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value(IntPtr record, int value_entry, out IntPtr record_value, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_column_type(IntPtr record, int value_entry, out uint column_type, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_utf8_value_size(IntPtr record, int value_entry, out UIntPtr utf8_value_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_utf8_string_size(IntPtr record, int value_entry, out UIntPtr utf8_string_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_utf8_string(IntPtr record, int value_entry, byte[] utf8_value, UIntPtr utf8_value_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_data_size(IntPtr record, int value_entry, out UIntPtr value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_data(IntPtr record, int value_entry, byte[] value_data, UIntPtr value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_data_flags(IntPtr record, int value_entry, out byte value_data_flags, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_32bit(IntPtr record, int value_entry, out uint value_32bit, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_64bit(IntPtr record, int value_entry, out ulong value_64bit, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_data(IntPtr multi_value, int multi_value_index, byte[] value_data, nuint value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_data_size(IntPtr multi_value, int multi_value_index, out nuint value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_number_of_values(IntPtr multi_value, out int number_of_values, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_multi_value(IntPtr record, int value_entry, out IntPtr multi_value, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_free(ref IntPtr multi_value, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_binary_data_size(IntPtr multi_value, int multi_value_index, out nuint value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_binary_data(IntPtr multi_value, int multi_value_index, byte[] value_data, nuint value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_utf8_string_size(IntPtr multi_value, int multi_value_index, out nuint utf8_string_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_utf8_string(IntPtr multi_value, int multi_value_index, byte[] utf8_string, nuint utf8_string_size, out IntPtr error);
         // Error handling
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_error_free(ref IntPtr error);
         // Compression - not yet available
-        // [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        // [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         // private static extern int libesedb_compression_7bit_decompress_get_size(byte[] compressed_data, UIntPtr compressed_data_size, out UIntPtr uncompressed_data_size, IntPtr error);
 
-        // [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        // [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         // private static extern int libesedb_compression_7bit_decompress(byte[] compressed_data, UIntPtr compressed_data_size, byte[] uncompressed_data, UIntPtr uncompressed_data_size, IntPtr error);
 
         #endregion
 
         public void Open(string databasePath)
         {
-            if (_isOpen)
-                return;
+            if (_isOpen) return;
 
             int result = libesedb_file_initialize(out _fileHandle, out nint error);
             if (result != 1)
             {
                 throw new Exception("Failed to initialize libesedb file");
             }
-            result = libesedb_file_open_wide(_fileHandle, databasePath, 0x01, out error);
-            if (result != 1)
+            try
             {
-                _ = libesedb_file_free(ref _fileHandle, out error);
-                throw new Exception($"Failed to open database: {databasePath}");
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    result = libesedb_file_open_wide(_fileHandle, databasePath, 0x01, out error);
+                }
+                else
+                {
+                    byte[] utf8Path = Encoding.UTF8.GetBytes(databasePath + '\0');
+                    result = libesedb_file_open(_fileHandle, utf8Path, 0x01, out error);
+                }
+                if (result != 1)
+                {
+                    throw new Exception($"Failed to open database: {databasePath}");
+                }
+                _isOpen = true;
             }
-
-            _isOpen = true;
+            catch
+            {
+                if (_fileHandle != nint.Zero)
+                {
+                    _ = libesedb_file_free(ref _fileHandle, out error);
+                }
+                throw;
+            }
         }
 
         public List<string> GetTableNames()
