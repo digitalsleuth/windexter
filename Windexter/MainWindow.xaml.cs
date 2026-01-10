@@ -3000,7 +3000,14 @@ namespace Windexter
             {
                 byte currentByte = data[i];
                 int charCode = ((currentByte << shift) & 0x7F) | (prevByte >> (8 - shift));
-                sb.Append((char)charCode);
+                if (dbType == "esedb")
+                {
+                    AppendIfPrintable(sb, charCode);
+                }
+                else
+                {
+                    sb.Append((char)charCode);
+                }
 
                 shift++;
                 if (shift == 7)
@@ -3008,7 +3015,14 @@ namespace Windexter
                     // After every 7 bytes processed, there are 7 "leftover" bits in the current byte.
                     // This forms an 8th character.
                     int eighthChar = (currentByte >> 1) & 0x7F;
-                    sb.Append((char)eighthChar);
+                    if (dbType == "esedb")
+                    {
+                        AppendIfPrintable(sb, eighthChar);
+                    }
+                    else
+                    {
+                        sb.Append((char)eighthChar);
+                    }
                     shift = 0;
                     prevByte = 0;
                 }
@@ -3017,7 +3031,15 @@ namespace Windexter
                     prevByte = currentByte;
                 }
             }
-            return sb.ToString();
+            return sb.ToString().Replace('\0', ' ').Trim();
+        }
+
+        static void AppendIfPrintable(StringBuilder sb, int code)
+        {
+            if (code >= 0x20 && code <= 0x7E)
+            {
+                sb.Append((char)code);
+            }
         }
 
         private bool GetIndexPropertyStore(List<List<object>> propertyStore, List<List<object>> propertyMetadata)
@@ -3434,6 +3456,17 @@ namespace Windexter
                         stores.Add(store);
                         return stores;
                     }
+                    else if ((blob[0] == 19 && blob[1] == 1) || (blob[0] == 20 && blob[1] == 1) || (blob[0] == 23 && blob[1] == 1))
+                    {
+                        string data;
+                        List<string> dataStrings = [];
+                        data = Decompress7Bit(blob);
+                        dataStrings.Add(data.Replace('\0', ' ').Trim());
+                        var store = new SerializedPropertyStore { FormatId = "7-bit Compressed String" };
+                        store.Properties["Data"] = string.Join(" ", dataStrings);
+                        stores.Add(store);
+                        return stores;
+                    }
                     int storeSize = reader.ReadInt32();
                     long endPos = reader.BaseStream.Position - 4 + storeSize;
                     while (reader.BaseStream.Position < endPos)
@@ -3510,6 +3543,14 @@ namespace Windexter
                         stores.Add(store);
                         reader.BaseStream.Seek(storageEnd, SeekOrigin.Begin);
                     }
+                }
+                if (stores.Count == 0)
+                {
+                    var rawBytes = Convert.ToHexString(blob);
+                    var store = new SerializedPropertyStore { FormatId = "Raw Binary Data" };
+                    store.Properties["Data"] = rawBytes;
+                    stores.Add(store);
+                    return stores;
                 }
                 return stores;
             }
@@ -3688,136 +3729,139 @@ namespace Windexter
         #region P/Invoke Declarations
 
         // File operations
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern int libesedb_file_initialize(out IntPtr file, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern int libesedb_file_free(ref IntPtr file, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int libesedb_file_open(IntPtr file, byte[] filename, int access_flags, out IntPtr error);
+
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
         private static extern int libesedb_file_open_wide(IntPtr file, string filename, int access_flags, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_file_close(IntPtr file, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_file_get_number_of_tables(IntPtr file, out int number_of_tables, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_file_get_table(IntPtr file, int table_entry, out IntPtr table, out IntPtr error);
 
         // Table operations
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_free(ref IntPtr table, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_utf8_name_size(IntPtr table, out UIntPtr utf8_name_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_utf8_name(IntPtr table, byte[] utf8_name, UIntPtr utf8_name_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_number_of_columns(IntPtr table, out int number_of_columns, int flags, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_column(IntPtr table, int column_entry, out IntPtr column, int flags, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_number_of_records(IntPtr table, out int number_of_records, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_table_get_record(IntPtr table, int record_entry, out IntPtr record, out IntPtr error);
 
         // Column operations
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_column_free(ref IntPtr column, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_column_get_utf8_name_size(IntPtr column, out UIntPtr utf8_name_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_column_get_utf8_name(IntPtr column, byte[] utf8_name, UIntPtr utf8_name_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_column_get_type(IntPtr column, out uint column_type, out IntPtr error);
 
         // Record operations
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_free(ref IntPtr record, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_is_long_value(IntPtr record, int value_entry, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_is_multi_value(IntPtr record, int value_entry, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_number_of_values(IntPtr record, out int number_of_values, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value(IntPtr record, int value_entry, out IntPtr record_value, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_column_type(IntPtr record, int value_entry, out uint column_type, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_utf8_value_size(IntPtr record, int value_entry, out UIntPtr utf8_value_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_utf8_string_size(IntPtr record, int value_entry, out UIntPtr utf8_string_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_utf8_string(IntPtr record, int value_entry, byte[] utf8_value, UIntPtr utf8_value_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_data_size(IntPtr record, int value_entry, out UIntPtr value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_data(IntPtr record, int value_entry, byte[] value_data, UIntPtr value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_data_flags(IntPtr record, int value_entry, out byte value_data_flags, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_32bit(IntPtr record, int value_entry, out uint value_32bit, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_value_64bit(IntPtr record, int value_entry, out ulong value_64bit, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_data(IntPtr multi_value, int multi_value_index, byte[] value_data, nuint value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_data_size(IntPtr multi_value, int multi_value_index, out nuint value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_number_of_values(IntPtr multi_value, out int number_of_values, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_record_get_multi_value(IntPtr record, int value_entry, out IntPtr multi_value, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_free(ref IntPtr multi_value, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_binary_data_size(IntPtr multi_value, int multi_value_index, out nuint value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_binary_data(IntPtr multi_value, int multi_value_index, byte[] value_data, nuint value_data_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_utf8_string_size(IntPtr multi_value, int multi_value_index, out nuint utf8_string_size, out IntPtr error);
 
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_multi_value_get_value_utf8_string(IntPtr multi_value, int multi_value_index, byte[] utf8_string, nuint utf8_string_size, out IntPtr error);
         // Error handling
-        [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         private static extern int libesedb_error_free(ref IntPtr error);
         // Compression - not yet available
-        // [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        // [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         // private static extern int libesedb_compression_7bit_decompress_get_size(byte[] compressed_data, UIntPtr compressed_data_size, out UIntPtr uncompressed_data_size, IntPtr error);
 
-        // [DllImport("libesedb.dll", CallingConvention = CallingConvention.Cdecl)]
+        // [DllImport("libesedb", CallingConvention = CallingConvention.Cdecl)]
         // private static extern int libesedb_compression_7bit_decompress(byte[] compressed_data, UIntPtr compressed_data_size, byte[] uncompressed_data, UIntPtr uncompressed_data_size, IntPtr error);
 
         #endregion

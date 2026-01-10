@@ -1747,10 +1747,10 @@ namespace windexter_cli
             [Option('u', "url", HelpText = "Filter for URLs.")]
             public bool Url { get; set; }
 
-            [Option("gather", HelpText = "Process Windows-gather.db if present (and source is a Windows.db file)")]
+            [Option("gather", HelpText = "Process Windows-gather.db if present (and -f is a Windows.db file).")]
             public bool Gather { get; set; }
 
-            [Option("propmap", HelpText = "Process PropMap.db if present.")]
+            [Option("propmap", HelpText = "Process PropMap.db if present (and -f is a Windows.db file).")]
             public bool PropMap { get; set; }
 
         }
@@ -2830,7 +2830,14 @@ namespace windexter_cli
             {
                 byte currentByte = data[i];
                 int charCode = ((currentByte << shift) & 0x7F) | (prevByte >> (8 - shift));
-                sb.Append((char)charCode);
+                if (dbType == "esedb")
+                {
+                    AppendIfPrintable(sb, charCode);
+                }
+                else
+                {
+                    sb.Append((char)charCode);
+                }
 
                 shift++;
                 if (shift == 7)
@@ -2838,7 +2845,14 @@ namespace windexter_cli
                     // After every 7 bytes processed, there are 7 "leftover" bits in the current byte.
                     // This forms an 8th character.
                     int eighthChar = (currentByte >> 1) & 0x7F;
-                    sb.Append((char)eighthChar);
+                    if (dbType == "esedb")
+                    {
+                        AppendIfPrintable(sb, eighthChar);
+                    }
+                    else
+                    {
+                        sb.Append((char)eighthChar);
+                    }
                     shift = 0;
                     prevByte = 0;
                 }
@@ -2847,7 +2861,15 @@ namespace windexter_cli
                     prevByte = currentByte;
                 }
             }
-            return sb.ToString();
+            return sb.ToString().Replace('\0', ' ').Trim();
+        }
+
+        static void AppendIfPrintable(StringBuilder sb, int code)
+        {
+            if (code >= 0x20 && code <= 0x7E)
+            {
+                sb.Append((char)code);
+            }
         }
 
         private static bool GetIndexPropertyStore(List<List<object>> propertyStore, List<List<object>> propertyMetadata)
@@ -3243,6 +3265,17 @@ namespace windexter_cli
                         stores.Add(store);
                         return stores;
                     }
+                    else if ((blob[0] == 19 && blob[1] == 1) || (blob[0] == 20 && blob[1] == 1) || (blob[0] == 23 && blob[1] == 1))
+                    {
+                        string data;
+                        List<string> dataStrings = [];
+                        data = Decompress7Bit(blob);
+                        dataStrings.Add(data.Replace('\0', ' ').Trim());
+                        var store = new SerializedPropertyStore { FormatId = "7-bit Compressed String" };
+                        store.Properties["Data"] = string.Join(" ", dataStrings);
+                        stores.Add(store);
+                        return stores;
+                    }
                     int storeSize = reader.ReadInt32();
                     long endPos = reader.BaseStream.Position - 4 + storeSize;
                     while (reader.BaseStream.Position < endPos)
@@ -3319,6 +3352,14 @@ namespace windexter_cli
                         stores.Add(store);
                         reader.BaseStream.Seek(storageEnd, SeekOrigin.Begin);
                     }
+                }
+                if (stores.Count == 0)
+                {
+                    var rawBytes = Convert.ToHexString(blob);
+                    var store = new SerializedPropertyStore { FormatId = "Raw Binary Data" };
+                    store.Properties["Data"] = rawBytes;
+                    stores.Add(store);
+                    return stores;
                 }
                 return stores;
             }
