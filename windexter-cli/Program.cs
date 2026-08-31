@@ -7,8 +7,7 @@ using System.Text;
 using System.Text.Json;
 using CommandLine;
 using CommandLine.Text;
-using Microsoft.Extensions.FileSystemGlobbing;
-using OfficeOpenXml;
+using ClosedXML.Excel;
 using SQLitePCL;
 
 namespace windexter_cli
@@ -3107,7 +3106,6 @@ namespace windexter_cli
 
         private static async Task<bool> ExportToExcel(string filePath, Dictionary<string, List<List<object>>> dataToExport)
         {
-            ExcelPackage.License.SetNonCommercialOrganization("Digital Sleuth");
             if (dataToExport == null || dataToExport.Count == 0)
             {
                 Console.WriteLine("No data to export.");
@@ -3117,28 +3115,29 @@ namespace windexter_cli
             try
             {
                 await Task.Run(() => {
-                    using var package = new ExcelPackage();
+                    using var workbook = new XLWorkbook();
                     foreach (var (title, results) in dataToExport)
                     {
                         if (results is not [])
                         {
-                            var worksheet = package.Workbook.Worksheets.Add(title);
+                            var worksheet = workbook.Worksheets.Add(title);
+                            int lastCol = results[0].Count;
                             HashSet<int> dateTimeCols = [];
-                            for (int col = 0; col < results[0].Count; col++)
+                            for (int col = 0; col < lastCol; col++)
                             {
                                 string header = results[0][col]?.ToString() ?? string.Empty;
                                 int excelCol = col + 1;
 
-                                worksheet.Cells[1, excelCol].Value = header;
+                                worksheet.Cell(1, excelCol).Value = header;
 
                                 if (dateTimes.Contains(header) || header == "Timestamp")
                                 {
                                     dateTimeCols.Add(excelCol);
-                                    worksheet.Column(excelCol).Style.Numberformat.Format = "yyyy-MM-dd HH:mm:ss";
+                                    worksheet.Column(excelCol).Style.NumberFormat.Format = "yyyy-MM-dd HH:mm:ss";
                                 }
                                 else
                                 {
-                                    worksheet.Column(excelCol).Style.Numberformat.Format = "@";
+                                    worksheet.Column(excelCol).Style.NumberFormat.Format = "@";
                                 }
                             }
                             for (int row = 1; row < results.Count; row++)
@@ -3148,7 +3147,7 @@ namespace windexter_cli
                                 for (int col = 0; col < dataRow.Count; col++)
                                 {
                                     int excelCol = col + 1;
-                                    var cell = worksheet.Cells[row + 1, excelCol];
+                                    var cell = worksheet.Cell(row + 1, excelCol);
 
                                     if (dateTimeCols.Contains(excelCol))
                                     {
@@ -3162,7 +3161,7 @@ namespace windexter_cli
                                         }
                                         else
                                         {
-                                            cell.Value = null;
+                                            cell.Clear();
                                         }
                                     }
                                     else
@@ -3171,13 +3170,12 @@ namespace windexter_cli
                                     }
                                 }
                             }
-                            worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
-                            worksheet.View.FreezePanes(2, 1);
-                            worksheet.Cells[1, 1, 1, worksheet.Dimension.End.Column]
-                                     .AutoFilter = true;
+                            worksheet.Columns().AdjustToContents();
+                            worksheet.SheetView.Freeze(1, 0);
+                            worksheet.Range(1, 1, results.Count, lastCol);
                         }
                     }
-                    package.SaveAs(new FileInfo(filePath));
+                    workbook.SaveAs(filePath);
                 });
                 return true;
             }
