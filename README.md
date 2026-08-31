@@ -69,4 +69,5 @@ Finally, click `Go!`. Your output will be saved as an XLSX file named either:
 ## Project Details
 
 This application was written in C#, utilizing the Windows Presentation Framework (WPF), and relies on [libesedb](https://github.com/libyal/libesedb/) project by Joachim Metz for easy access to the contents of the ESE database without the use of an API, and without the need to recover / repair for access. It also uses the [SQLitePCLRaw](https://github.com/ericsink/SQLitePCL.raw) library to enable read-only access to the SQLite databases.  
-The Excel output is generated using the [EPPlus package](https://www.epplussoftware.com/en/LicenseOverview/) and is not intended for use in a commercial environment.
+
+The Excel output is generated using [ClosedXML](https://github.com/ClosedXML/ClosedXML) and is subject to the conditions of the [MIT License](https://github.com/ClosedXML/ClosedXML/blob/develop/LICENSE).
