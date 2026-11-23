@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Windexter"
         mc:Ignorable="d"
-        Title="Windexter" SizeToContent="Height" Width="365"
+        Title="Windexter" SizeToContent="Height" Width="405"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanMinimize">
     <DockPanel>
@@ -30,7 +30,7 @@
                 </MenuItem>
             </MenuItem>
         </Menu>
-        <Grid x:Name="MainGrid" MinHeight="135">
+        <Grid x:Name="MainGrid" MinHeight="162">
             <Label x:Name="DBPathLabel" Content="Database Path" HorizontalAlignment="Left" Margin="8,8,0,0" VerticalAlignment="Top" Height="26"/>
             <TextBox x:Name="DBPath" Height="22" HorizontalAlignment="Left" Margin="99,10,0,0" TextWrapping="NoWrap" Text="" VerticalAlignment="Top" Width="192" TabIndex="0"/>
             <Button x:Name="DBPathPicker" Content="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="18" HorizontalAlignment="Left" BorderThickness="0" Background="White" Foreground="Gray" Margin="296,10,0,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Top" Height="22" Width="30" Click="DBPicker" TabIndex="1"/>
@@ -48,7 +48,14 @@
             <CheckBox x:Name="GPSCheck" Content="GPS" HorizontalAlignment="Left" Margin="206,83,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any GPS data found, if present." TabIndex="9"/>
             <CheckBox x:Name="ActivityCheck" Content="Activity History" HorizontalAlignment="Left" Margin="98,103,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet for any Activity History data found, if present." TabIndex="10"/>
             <CheckBox x:Name="TimelineCheck" Content="Timeline" HorizontalAlignment="Left" Margin="206,103,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Outputs a separate Excel Worksheet containing a timeline of all events." TabIndex="11"/>
-            
+            <CheckBox x:Name="GatherCheck" Content="Gather" HorizontalAlignment="Left" Margin="300,63,0,0" VerticalAlignment="Top" FontSize="12" IsEnabled="False" ToolTip="Also processes the Windows-gather.db found next to the selected Windows.db. Unavailable when none is found." TabIndex="14"/>
+            <CheckBox x:Name="PropMapCheck" Content="PropMap" HorizontalAlignment="Left" Margin="300,83,0,0" VerticalAlignment="Top" FontSize="12" IsEnabled="False" ToolTip="Also processes the PropMap.db found in or below the folder of the selected Windows.db. Unavailable when none is found." TabIndex="15"/>
+            <CheckBox x:Name="SecStoreCheck" Content="SecStore" HorizontalAlignment="Left" Margin="300,103,0,0" VerticalAlignment="Top" FontSize="12" IsEnabled="False" ToolTip="Also processes the SecStore.db found in or below the folder of the selected Windows.db, adding the security descriptors. Unavailable when none is found." TabIndex="16"/>
+            <StackPanel x:Name="OutputFormatPanel" HorizontalAlignment="Left" Margin="9,121,0,0" VerticalAlignment="Top">
+                <CheckBox x:Name="XlsxCheck" Content="Spreadsheet" IsChecked="True" Padding="2,0,0,0" FontSize="12" ToolTip="Saves the results as an Excel workbook." TabIndex="12"/>
+                <CheckBox x:Name="SqliteCheck" Content="SQLite" Margin="0,2,0,0" Padding="2,0,0,0" FontSize="12" ToolTip="Saves the results as an SQLite database, with views for the URL, GPS, System Info, Activity, Auto Summary and Timeline data." TabIndex="13"/>
+            </StackPanel>
+
         </Grid>
     </DockPanel>
 </Window>
